@@ -2,10 +2,18 @@ import express from 'express';
 import 'dotenv/config';
 import cors from 'cors';
 import pool from './db/pool';
+import rateLimit from 'express-rate-limit';
 
 const app = express();
 app.use(cors({ origin: 'http://localhost:5173' }));
 app.use(express.json());
+
+const limiter = rateLimit({
+  windowMs: 15*60*1000,
+  max: 100,
+});
+
+app.use(limiter);
 
 app.get('/tasks', async (req, res) => {
   try {
