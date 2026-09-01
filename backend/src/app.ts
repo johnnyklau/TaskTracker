@@ -4,19 +4,20 @@ import cors from 'cors';
 import pool from './db/pool';
 
 const app = express();
-app.use(cors({origin: 'http://localhost:5173'}))
+app.use(cors({ origin: 'http://localhost:5173' }));
 app.use(express.json());
-
 
 app.get('/tasks', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM tasks ORDER BY created_at DESC');
+    const result = await pool.query(
+      'SELECT * FROM tasks ORDER BY created_at DESC'
+    );
     res.status(200).json(result.rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch tasks' });
   }
-})
+});
 
 app.post('/tasks', async (req, res) => {
   const { title } = req.body;
@@ -27,14 +28,15 @@ app.post('/tasks', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'INSERT INTO tasks (title) VALUES ($1) RETURNING *', [title]
+      'INSERT INTO tasks (title) VALUES ($1) RETURNING *',
+      [title]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to create task' });
   }
-})
+});
 
 app.patch('/tasks/:id', async (req, res) => {
   const { id } = req.params;
@@ -55,14 +57,15 @@ app.patch('/tasks/:id', async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Failed to update task' });
   }
-})
+});
 
 app.delete('/tasks/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
     const result = await pool.query(
-      'DELETE FROM tasks WHERE id = $1 RETURNING *', [id]
+      'DELETE FROM tasks WHERE id = $1 RETURNING *',
+      [id]
     );
 
     if (result.rows.length === 0) {
@@ -72,7 +75,7 @@ app.delete('/tasks/:id', async (req, res) => {
     res.status(204).send();
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to delete task" });
+    res.status(500).json({ error: 'Failed to delete task' });
   }
 });
 
