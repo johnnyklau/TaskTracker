@@ -9,7 +9,7 @@ app.use(cors({ origin: 'http://localhost:5173' }));
 app.use(express.json());
 
 const limiter = rateLimit({
-  windowMs: 15*60*1000,
+  windowMs: 15 * 60 * 1000,
   max: 100,
 });
 
