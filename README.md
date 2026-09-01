@@ -6,5 +6,4 @@ This project is created with a simple goal: take a simple concept and flesh it o
 
 This is a basic to-do style app, but my aim was to ensure it was as complete as possible: CI/CD, fully tested, full-stack web app as the end goal.
 
-This is also a departure from AI-assisted tools to freshen up on the fundamentals. 
-
+This is also a departure from AI-assisted tools to freshen up on the fundamentals.
