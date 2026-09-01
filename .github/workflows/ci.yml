@@ -18,7 +18,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run test
-      - run: npm run build
+      - run: npm run build  
   backend:
     runs-on: ubuntu-latest
     defaults:
@@ -39,7 +39,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABSE_URL: postgresql://postgres:postgres@localhost:5432/tasktracker
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tasktracker
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
