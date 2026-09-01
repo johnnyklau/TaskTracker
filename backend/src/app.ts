@@ -16,8 +16,8 @@ const limiter = rateLimit({
 app.use(limiter);
 
 app.get('/health', async (req, res) => {
-  res.status(200).json({status: 'ok'});
-})
+  res.status(200).json({ status: 'ok' });
+});
 
 app.get('/tasks', async (req, res) => {
   try {
