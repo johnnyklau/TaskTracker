@@ -1,0 +1,25 @@
+{
+  "name": "tasktracker",
+  "version": "1.0.0",
+  "description": "This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.",
+  "main": "index.js",
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/johnnyklau/TaskTracker.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/johnnyklau/TaskTracker/issues"
+  },
+  "homepage": "https://github.com/johnnyklau/TaskTracker#readme",
+  "devDependencies": {
+    "prettier": "3.9.6"
+  }
+}

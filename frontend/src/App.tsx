@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react';
-import { fetchTasks, createTask, updateTaskCompleted, deleteTask, type Task } from './api/tasks';
+import {
+  fetchTasks,
+  createTask,
+  updateTaskCompleted,
+  deleteTask,
+  type Task,
+} from './api/tasks';
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -19,7 +25,7 @@ function App() {
   }
 
   async function handleToggleComplete(task: Task) {
-    const updated = await updateTaskCompleted(task.id, !task.completed)
+    const updated = await updateTaskCompleted(task.id, !task.completed);
     setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
   }
 
@@ -32,22 +38,28 @@ function App() {
     <div>
       <h1>TaskTracker</h1>
       <form onSubmit={handleAddTask}>
-        <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)}
-          placeholder='Add a task' />
+        <input
+          value={newTitle}
+          onChange={(e) => setNewTitle(e.target.value)}
+          placeholder="Add a task"
+        />
         <button type="submit">Add</button>
       </form>
       <ul>
         {tasks.map((task) => (
           <li key={task.id}>
-            <input type='checkbox' checked={task.completed} onChange={() => handleToggleComplete(task)} />
+            <input
+              type="checkbox"
+              checked={task.completed}
+              onChange={() => handleToggleComplete(task)}
+            />
             {task.title}
             <button onClick={() => handleDeleteTask(task.id)}>Delete</button>
           </li>
         ))}
       </ul>
     </div>
-
-  )
+  );
 }
 
 export default App;
