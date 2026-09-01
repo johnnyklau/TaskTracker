@@ -4,6 +4,9 @@ updates:
     directory: '/frontend'
     schedule:
       interval: 'weekly'
+    ignore:
+      - dependency-name: "typescript"
+        versions: [">=6.1.0"]
 
   - package-ecosystem: 'npm'
     directory: '/backend'
