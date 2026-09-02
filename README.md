@@ -8,6 +8,28 @@ This project is created with a simple goal: take a simple concept and flesh it o
 
 This is a basic to-do style app, but my aim was to ensure it was as complete as possible: CI/CD, fully tested, full-stack web app as the end goal. This is also a departure from AI-assisted tools to freshen up on the fundamentals.
 
+## Tech Stack
+
+**Front-end:** React + TypeScript built with Vite, deployed on Vercel.
+
+**Back-end:** Node + Express, containerized with Docker, deployed to Render.
+
+**Database:** PostgreSQL, hosted on Neon.
+
+**Testing:**
+- Frontend — Vitest + React Testing Library
+- Backend — Vitest + Supertest, run against a real Postgres instance
+  (locally via Docker Compose, in CI via a GitHub Actions service container)
+
+**CI/CD:** GitHub Actions.
+- CI: lint, test, and build both projects, plus a Docker image build, on every PR
+- CD: on merge to `main`, deploys the frontend to Vercel and the backend
+  image to Render, each via their respective CLI/API rather than native
+  git-triggered auto-deploy, keeping the deploy step explicit and visible
+
+**Also configured:** branch protection (CI must pass to merge), Dependabot
+(dependency + GitHub Actions updates), and CodeQL (automated security scanning).
+
 ## Running Locally
 
 ### Prerequisites
@@ -24,24 +46,24 @@ This is a basic to-do style app, but my aim was to ensure it was as complete as 
 
 Start Postgres only, run the backend directly for fast reload on save:
 
-\`\`\`
+```
 docker compose up -d postgres
 cd backend && npm run dev
-\`\`\`
+```
 
 In a second terminal, start the frontend:
 
-\`\`\`
+```
 cd frontend && npm run dev
-\`\`\`
+```
 
 ### Option B — fully containerized
 
 Runs the backend exactly as it would build in CI/production:
 
-\`\`\`
+```
 docker compose up
-\`\`\`
+```
 
 Then separately start the frontend with `npm run dev`, same as above — the frontend was never containerized (see the architecture notes above).
 
@@ -49,6 +71,6 @@ Then separately start the frontend with `npm run dev`, same as above — the fro
 
 Load the schema once against a fresh Postgres:
 
-\`\`\`
+```
 docker compose exec -T postgres psql -U postgres -d tasktracker < backend/src/db/schema.sql
-\`\`\`
+```
