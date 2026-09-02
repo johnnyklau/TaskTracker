@@ -22,8 +22,9 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+      - run: npm ci
       - run: npm install --global vercel
-      - run: vercel pull --yes --environment=production --token=$VERCEL_TOKEN --debug
+      - run: vercel pull --yes --environment=production --token=$VERCEL_TOKEN
       - run: vercel build --prod --token=$VERCEL_TOKEN
       - run: vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
 
