@@ -1,4 +1,5 @@
 # TaskTracker
+
 https://tasktracker-hsy.vercel.app/
 
 [![.github/workflows/ci.yml](https://github.com/johnnyklau/TaskTracker/actions/workflows/ci.yml/badge.svg)](https://github.com/johnnyklau/TaskTracker/actions/workflows/ci.yml)
@@ -33,6 +34,7 @@ This is a basic to-do style app, but my aim was to ensure it was as complete as 
 ## Running Locally
 
 ### Prerequisites
+
 - Node 24
 - Docker or OrbStack running
 
