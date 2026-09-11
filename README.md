@@ -1,4 +1,5 @@
 # TaskTracker
+
 https://tasktracker-hsy.vercel.app/
 
 [![.github/workflows/ci.yml](https://github.com/johnnyklau/TaskTracker/actions/workflows/ci.yml/badge.svg)](https://github.com/johnnyklau/TaskTracker/actions/workflows/ci.yml)
@@ -17,11 +18,13 @@ This is a basic to-do style app, but my aim was to ensure it was as complete as 
 **Database:** PostgreSQL, hosted on Neon.
 
 **Testing:**
+
 - Frontend — Vitest + React Testing Library
 - Backend — Vitest + Supertest, run against a real Postgres instance
   (locally via Docker Compose, in CI via a GitHub Actions service container)
 
 **CI/CD:** GitHub Actions.
+
 - CI: lint, test, and build both projects, plus a Docker image build, on every PR
 - CD: on merge to `main`, deploys the frontend to Vercel and the backend
   image to Render, each via their respective CLI/API rather than native
@@ -33,6 +36,7 @@ This is a basic to-do style app, but my aim was to ensure it was as complete as 
 ## Running Locally
 
 ### Prerequisites
+
 - Node 24
 - Docker or OrbStack running
 
