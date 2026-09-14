@@ -5,16 +5,16 @@ updates:
     schedule:
       interval: 'weekly'
     ignore:
-      - dependency-name: 'typescript'
-        versions: ['>=6.1.0']
+      - dependency-name: '@types/node'
+        versions: ['26.x']
 
   - package-ecosystem: 'npm'
     directory: '/backend'
     schedule:
       interval: 'weekly'
     ignore:
-      - dependency-name: '@types/node'
-        versions: ['26.x']
+      - dependency-name: 'typescript'
+        versions: ['>=6.1.0']
 
   - package-ecosystem: 'github-actions'
     directory: '/'
