@@ -1,4 +1,4 @@
-import express, { NextFunction } from 'express';
+import express from 'express';
 import 'dotenv/config';
 import cors from 'cors';
 import pool from './db/pool';
@@ -145,9 +145,9 @@ app.delete('/tasks/:id', async (req, res) => {
 app.use(
   (
     err: Error,
-    req: express.Request,
+    _req: express.Request,
     res: express.Response,
-    next: express.NextFunction
+    _next: express.NextFunction
   ) => {
     console.error(err);
     res.status(400).json({ error: 'Invalid request' });
