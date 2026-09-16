@@ -1,37 +1,36 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { type Task } from './api/tasks';
 import {
-  fetchTasks,
-  createTask,
-  updateTaskCompleted,
-  deleteTask,
-  type Task,
-} from './api/tasks';
+  useAddTask,
+  useCompleteTask,
+  useDeleteTask,
+  useTasks,
+} from './hooks/useTasks';
 
 function App() {
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [newTitle, setNewTitle] = useState('');
 
-  useEffect(() => {
-    fetchTasks().then(setTasks);
-  }, []);
+  const { data: tasks = [], isPending, isError } = useTasks();
+  const completeTaskMutation = useCompleteTask();
+  const addTaskMutation = useAddTask();
+  const deleteTaskMutation = useDeleteTask();
 
-  async function handleAddTask(e: React.SubmitEvent<HTMLFormElement>) {
+  if (isPending) return <></>;
+  if (isError) return <></>; // TODO: Address loading/error states
+
+  function handleToggleComplete(task: Task) {
+    completeTaskMutation.mutate({ id: task.id, completed: !task.completed });
+  }
+
+  function handleAddTask(e: React.SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!newTitle.trim()) return;
-
-    const newTask = await createTask(newTitle);
-    setTasks((prev) => [newTask, ...prev]);
+    addTaskMutation.mutate(newTitle);
     setNewTitle('');
   }
 
-  async function handleToggleComplete(task: Task) {
-    const updated = await updateTaskCompleted(task.id, !task.completed);
-    setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-  }
-
-  async function handleDeleteTask(id: number) {
-    await deleteTask(id);
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+  function handleDeleteTask(id: number) {
+    deleteTaskMutation.mutate(id);
   }
 
   return (
