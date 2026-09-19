@@ -1,12 +1,7 @@
-CREATE TABLE tasks (
-    id SERIAL PRIMARY KEY,
-    title TEXT NOT NULL,
-    completed BOOLEAN NOT NULL DEFAULT false,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    notes TEXT NOT NULL DEFAULT '',
-    x REAL,
-    y REAL
-);
+ALTER TABLE tasks
+  ADD COLUMN notes TEXT NOT NULL DEFAULT '',
+  ADD COLUMN x REAL,
+  ADD COLUMN y REAL;
 
 CREATE TABLE subtasks (
   id SERIAL PRIMARY KEY,
@@ -17,5 +12,4 @@ CREATE TABLE subtasks (
   dy REAL NOT NULL DEFAULT -140,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
 CREATE INDEX subtasks_task_id_idx ON subtasks(task_id);
