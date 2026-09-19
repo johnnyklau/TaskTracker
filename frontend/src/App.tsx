@@ -1,64 +1,22 @@
-import { useState } from 'react';
-import { type Task } from './api/tasks';
-import {
-  useAddTask,
-  useCompleteTask,
-  useDeleteTask,
-  useTasks,
-} from './hooks/useTasks';
+import { useTasks } from './hooks/useTasks';
+import { CanvasView } from './components/CanvasView';
 
 function App() {
-  const [newTitle, setNewTitle] = useState('');
-
   const { data: tasks = [], isPending, isError } = useTasks();
-  const completeTaskMutation = useCompleteTask();
-  const addTaskMutation = useAddTask();
-  const deleteTaskMutation = useDeleteTask();
 
-  if (isPending) return <></>;
-  if (isError) return <></>; // TODO: Address loading/error states
-
-  function handleToggleComplete(task: Task) {
-    completeTaskMutation.mutate({ id: task.id, completed: !task.completed });
+  if (isPending) {
+    return <div className="h-full min-h-140 w-full bg-canvas" />;
   }
 
-  function handleAddTask(e: React.SubmitEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!newTitle.trim()) return;
-    addTaskMutation.mutate(newTitle);
-    setNewTitle('');
+  if (isError) {
+    return (
+      <div className="flex h-full min-h-140 w-full items-center justify-center bg-canvas text-ink-soft">
+        Something went wrong loading your tasks.
+      </div>
+    );
   }
 
-  function handleDeleteTask(id: number) {
-    deleteTaskMutation.mutate(id);
-  }
-
-  return (
-    <div>
-      <h1>TaskTracker</h1>
-      <form onSubmit={handleAddTask}>
-        <input
-          value={newTitle}
-          onChange={(e) => setNewTitle(e.target.value)}
-          placeholder="Add a task"
-        />
-        <button type="submit">Add</button>
-      </form>
-      <ul>
-        {tasks.map((task) => (
-          <li key={task.id}>
-            <input
-              type="checkbox"
-              checked={task.completed}
-              onChange={() => handleToggleComplete(task)}
-            />
-            {task.title}
-            <button onClick={() => handleDeleteTask(task.id)}>Delete</button>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+  return <CanvasView tasks={tasks} />;
 }
 
 export default App;
