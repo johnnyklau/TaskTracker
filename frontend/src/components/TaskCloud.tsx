@@ -12,7 +12,13 @@ type TaskCloudProps = {
   onOpen: (id: number, el: HTMLElement) => void;
 };
 
-export function TaskCloud({ task, zoom, opacity, onMove, onOpen }: TaskCloudProps) {
+export function TaskCloud({
+  task,
+  zoom,
+  opacity,
+  onMove,
+  onOpen,
+}: TaskCloudProps) {
   const x = task.x ?? 0;
   const y = task.y ?? 0;
 
@@ -37,7 +43,13 @@ export function TaskCloud({ task, zoom, opacity, onMove, onOpen }: TaskCloudProp
       // making any other incidental bounding-box correction instant.
       transition={{ layout: { duration: 0 } }}
       className="absolute -translate-x-1/2 -translate-y-1/2 cursor-grab transition-opacity duration-260 ease-out"
-      style={{ left: x, top: y, width: MAIN_CLOUD_WIDTH, aspectRatio: CLOUD_ASPECT_RATIO, opacity }}
+      style={{
+        left: x,
+        top: y,
+        width: MAIN_CLOUD_WIDTH,
+        aspectRatio: CLOUD_ASPECT_RATIO,
+        opacity,
+      }}
       onPointerDown={handlePointerDown}
       onKeyDown={(e) => {
         if (e.key === 'Enter') onOpen(task.id, e.currentTarget);

@@ -18,7 +18,14 @@ type DraftSubtaskCloudProps = {
  * discards it, so an empty-titled subtask never has to round-trip the API
  * (which would reject it anyway).
  */
-export function DraftSubtaskCloud({ originX, originY, dx, dy, onCommit, onCancel }: DraftSubtaskCloudProps) {
+export function DraftSubtaskCloud({
+  originX,
+  originY,
+  dx,
+  dy,
+  onCommit,
+  onCancel,
+}: DraftSubtaskCloudProps) {
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const settledRef = useRef(false);
@@ -46,7 +53,10 @@ export function DraftSubtaskCloud({ originX, originY, dx, dy, onCommit, onCancel
       }}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      <CloudShape strokeClassName="stroke-outline-sub" className="animate-pulse" />
+      <CloudShape
+        strokeClassName="stroke-outline-sub"
+        className="animate-pulse"
+      />
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-[14%] text-center">
         <input
           ref={inputRef}

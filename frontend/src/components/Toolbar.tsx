@@ -27,7 +27,15 @@ export function Toolbar({
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="flex items-center gap-2.5 py-0 pr-1.5 pl-3.5">
-        <svg width="19" height="19" viewBox="0 0 22 22" fill="none" stroke="#EDB648" strokeWidth="2.4" strokeLinecap="round">
+        <svg
+          width="19"
+          height="19"
+          viewBox="0 0 22 22"
+          fill="none"
+          stroke="#EDB648"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+        >
           <path d="M11 4v14M4 11h14" />
         </svg>
         <input
@@ -46,7 +54,16 @@ export function Toolbar({
         title="Add task"
         className="flex h-[42px] items-center gap-2 rounded-[14px] bg-done px-[18px] text-[15px] font-semibold text-white transition-all duration-180 hover:brightness-105 active:translate-y-px"
       >
-        <svg width="15" height="15" viewBox="0 0 12 12" fill="none" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 12 12"
+          fill="none"
+          stroke="#FFFFFF"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M2 6.4 4.7 9 10 3.2" />
         </svg>
         Add
@@ -64,7 +81,15 @@ export function Toolbar({
           className="grid h-[42px] w-[42px] place-items-center rounded-[14px] transition-colors duration-180 hover:bg-hover-warm hover:text-ink"
           style={{ color: searchOpen ? '#1D1712' : '#B79A78' }}
         >
-          <svg width="19" height="19" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+          <svg
+            width="19"
+            height="19"
+            viewBox="0 0 22 22"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.9"
+            strokeLinecap="round"
+          >
             <circle cx="9.6" cy="9.6" r="6.4" />
             <path d="m14.4 14.4 4.4 4.4" />
           </svg>
@@ -93,7 +118,15 @@ export function Toolbar({
         title="Recenter canvas"
         className="grid h-[42px] w-[42px] place-items-center rounded-[14px] text-[#B79A78] transition-colors duration-180 hover:bg-hover-warm hover:text-ink"
       >
-        <svg width="19" height="19" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+        <svg
+          width="19"
+          height="19"
+          viewBox="0 0 22 22"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.9"
+          strokeLinecap="round"
+        >
           <circle cx="11" cy="11" r="6.2" />
           <path d="M11 1.6v2.6M11 17.8v2.6M1.6 11h2.6M17.8 11h2.6" />
         </svg>
@@ -104,7 +137,16 @@ export function Toolbar({
         title="Fit all tasks"
         className="grid h-[42px] w-[42px] place-items-center rounded-[14px] text-[#B79A78] transition-colors duration-180 hover:bg-hover-warm hover:text-ink"
       >
-        <svg width="19" height="19" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="19"
+          height="19"
+          viewBox="0 0 22 22"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.9"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M3 8V4.6A1.6 1.6 0 0 1 4.6 3H8M14 3h3.4A1.6 1.6 0 0 1 19 4.6V8M19 14v3.4a1.6 1.6 0 0 1-1.6 1.6H14M8 19H4.6A1.6 1.6 0 0 1 3 17.4V14" />
         </svg>
       </button>

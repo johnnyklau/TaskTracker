@@ -56,7 +56,11 @@ export function useUpdateTask() {
       // merge onto the cached task rather than replacing it wholesale, or
       // this drops subtasks and crashes anything that reads them.
       queryClient.setQueryData<Task[]>(tasksKey, (old) =>
-        old?.map((t) => (t.id === updatedTask.id ? { ...t, ...updatedTask, subtasks: t.subtasks } : t))
+        old?.map((t) =>
+          t.id === updatedTask.id
+            ? { ...t, ...updatedTask, subtasks: t.subtasks }
+            : t
+        )
       );
     },
     onError: (_err, _variables, context) => {
@@ -113,13 +117,15 @@ function useDebouncedPositionUpdate<TArgs extends { id: number }>({
 }
 
 export function useMoveTask() {
-  const move = useDebouncedPositionUpdate<{ id: number; x: number; y: number }>({
-    mutationFn: ({ id, x, y }) => updateTask(id, { x, y }),
-    applyOptimistic: (queryClient, { id, x, y }) =>
-      queryClient.setQueryData<Task[]>(tasksKey, (old) =>
-        old?.map((t) => (t.id === id ? { ...t, x, y } : t))
-      ),
-  });
+  const move = useDebouncedPositionUpdate<{ id: number; x: number; y: number }>(
+    {
+      mutationFn: ({ id, x, y }) => updateTask(id, { x, y }),
+      applyOptimistic: (queryClient, { id, x, y }) =>
+        queryClient.setQueryData<Task[]>(tasksKey, (old) =>
+          old?.map((t) => (t.id === id ? { ...t, x, y } : t))
+        ),
+    }
+  );
 
   return useCallback(
     (id: number, x: number, y: number) => move({ id, x, y }),
@@ -128,7 +134,11 @@ export function useMoveTask() {
 }
 
 export function useMoveSubtask() {
-  const move = useDebouncedPositionUpdate<{ id: number; dx: number; dy: number }>({
+  const move = useDebouncedPositionUpdate<{
+    id: number;
+    dx: number;
+    dy: number;
+  }>({
     mutationFn: ({ id, dx, dy }) => updateSubtask(id, { dx, dy }),
     applyOptimistic: (queryClient, { id, dx, dy }) =>
       queryClient.setQueryData<Task[]>(tasksKey, (old) =>

@@ -43,20 +43,28 @@ describe('App', () => {
 
     renderWithClient(<App />);
 
-    expect(await screen.findByRole('button', { name: 'Buy milk' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Walk the cat' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Buy milk' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Walk the cat' })
+    ).toBeInTheDocument();
   });
 
   it('clicking a cloud opens TaskView with the right title', async () => {
     const user = userEvent.setup();
-    vi.mocked(api.fetchTasks).mockResolvedValue([makeTask({ title: 'Pet the cat' })]);
+    vi.mocked(api.fetchTasks).mockResolvedValue([
+      makeTask({ title: 'Pet the cat' }),
+    ]);
 
     renderWithClient(<App />);
     const cloud = await screen.findByRole('button', { name: 'Pet the cat' });
     await user.click(cloud);
 
     expect(await screen.findByText('Notes')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Mark complete|Completed/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Mark complete|Completed/ })
+    ).toBeInTheDocument();
   });
 
   it('fires the update mutation when toggling complete in TaskView', async () => {
@@ -69,7 +77,9 @@ describe('App', () => {
     const cloud = await screen.findByRole('button', { name: 'Pet the cat' });
     await user.click(cloud);
 
-    const completeButton = await screen.findByRole('button', { name: 'Mark complete' });
+    const completeButton = await screen.findByRole('button', {
+      name: 'Mark complete',
+    });
     await user.click(completeButton);
 
     expect(api.updateTask).toHaveBeenCalledWith(3, { completed: true });
@@ -85,7 +95,9 @@ describe('App', () => {
     const cloud = await screen.findByRole('button', { name: 'Pet the cat' });
     await user.click(cloud);
 
-    const deleteButton = await screen.findByRole('button', { name: 'Delete task' });
+    const deleteButton = await screen.findByRole('button', {
+      name: 'Delete task',
+    });
     await user.click(deleteButton);
 
     expect(api.deleteTask).toHaveBeenCalledWith(7);
@@ -95,12 +107,19 @@ describe('App', () => {
   });
 
   it('debounces drag position updates into a single mutation call, not one per move', async () => {
-    const task = makeTask({ id: 5, title: 'Ship the drag-canvas prototype', x: 0, y: 0 });
+    const task = makeTask({
+      id: 5,
+      title: 'Ship the drag-canvas prototype',
+      x: 0,
+      y: 0,
+    });
     vi.mocked(api.fetchTasks).mockResolvedValue([task]);
     vi.mocked(api.updateTask).mockResolvedValue({ ...task, x: 80, y: 80 });
 
     renderWithClient(<App />);
-    const cloud = await screen.findByRole('button', { name: 'Ship the drag-canvas prototype' });
+    const cloud = await screen.findByRole('button', {
+      name: 'Ship the drag-canvas prototype',
+    });
 
     vi.useFakeTimers();
     try {

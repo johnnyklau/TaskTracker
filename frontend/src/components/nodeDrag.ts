@@ -21,7 +21,10 @@ export function createNodeDragHandler(
     let moved = false;
 
     function handleMove(ev: PointerEvent) {
-      const screenDistance = Math.hypot(ev.clientX - startX, ev.clientY - startY);
+      const screenDistance = Math.hypot(
+        ev.clientX - startX,
+        ev.clientY - startY
+      );
       if (!moved && screenDistance < DRAG_THRESHOLD_PX) return;
       moved = true;
       const dx = (ev.clientX - startX) / zoom;

@@ -74,7 +74,10 @@ function findSubtaskPlacement(existing: { dx: number; dy: number }[]): {
 
   // Fallback (shouldn't realistically happen with 40 attempts): stack
   // straight down far enough to clear everything tried so far.
-  return { dx: DEFAULT_SUBTASK_DX, dy: DEFAULT_SUBTASK_DY + existing.length * minDistance };
+  return {
+    dx: DEFAULT_SUBTASK_DX,
+    dy: DEFAULT_SUBTASK_DY + existing.length * minDistance,
+  };
 }
 
 export function CanvasView({ tasks }: CanvasViewProps) {
@@ -100,22 +103,27 @@ export function CanvasView({ tasks }: CanvasViewProps) {
     dy: number;
   } | null>(null);
 
-  const glideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const glideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  );
   const placedRef = useRef(new Set<number>());
   const didFitRef = useRef(false);
   const zoomRef = useRef(zoom);
   const camRef = useRef(cam);
   const openTaskIdRef = useRef(openTaskId);
 
-  const glideTo = useCallback((x: number, y: number, nextZoom: number, instant: boolean) => {
-    setCam({ x, y });
-    setZoom(nextZoom);
-    setCamAnim(!instant);
-    if (glideTimerRef.current) clearTimeout(glideTimerRef.current);
-    if (!instant) {
-      glideTimerRef.current = setTimeout(() => setCamAnim(false), 560);
-    }
-  }, []);
+  const glideTo = useCallback(
+    (x: number, y: number, nextZoom: number, instant: boolean) => {
+      setCam({ x, y });
+      setZoom(nextZoom);
+      setCamAnim(!instant);
+      if (glideTimerRef.current) clearTimeout(glideTimerRef.current);
+      if (!instant) {
+        glideTimerRef.current = setTimeout(() => setCamAnim(false), 560);
+      }
+    },
+    []
+  );
 
   const fitAll = useCallback(
     (instant: boolean) => {
@@ -124,7 +132,11 @@ export function CanvasView({ tasks }: CanvasViewProps) {
         if (task.x === null || task.y === null) return;
         boxes.push([task.x, task.y, MAIN_CLOUD_WIDTH]);
         task.subtasks.forEach((subtask) =>
-          boxes.push([task.x! + subtask.dx, task.y! + subtask.dy, SUB_CLOUD_WIDTH])
+          boxes.push([
+            task.x! + subtask.dx,
+            task.y! + subtask.dy,
+            SUB_CLOUD_WIDTH,
+          ])
         );
       });
 
@@ -135,8 +147,12 @@ export function CanvasView({ tasks }: CanvasViewProps) {
 
       const x0 = Math.min(...boxes.map(([bx, , w]) => bx - w / 2));
       const x1 = Math.max(...boxes.map(([bx, , w]) => bx + w / 2));
-      const y0 = Math.min(...boxes.map(([, by, w]) => by - w / CLOUD_ASPECT_RATIO / 2));
-      const y1 = Math.max(...boxes.map(([, by, w]) => by + w / CLOUD_ASPECT_RATIO / 2));
+      const y0 = Math.min(
+        ...boxes.map(([, by, w]) => by - w / CLOUD_ASPECT_RATIO / 2)
+      );
+      const y1 = Math.max(
+        ...boxes.map(([, by, w]) => by + w / CLOUD_ASPECT_RATIO / 2)
+      );
 
       const rect = rootRef.current?.getBoundingClientRect();
       const width = rect?.width || window.innerWidth;
@@ -222,7 +238,10 @@ export function CanvasView({ tasks }: CanvasViewProps) {
     const originCam = cam;
 
     function handleMove(ev: PointerEvent) {
-      setCam({ x: originCam.x + (ev.clientX - startX), y: originCam.y + (ev.clientY - startY) });
+      setCam({
+        x: originCam.x + (ev.clientX - startX),
+        y: originCam.y + (ev.clientY - startY),
+      });
     }
     function handleUp() {
       window.removeEventListener('pointermove', handleMove);
@@ -271,7 +290,10 @@ export function CanvasView({ tasks }: CanvasViewProps) {
 
       setZoom(nextZoom);
       setCamAnim(false);
-      setCam({ x: prevCam.x + (px - prevCam.x) * k, y: prevCam.y + (py - prevCam.y) * k });
+      setCam({
+        x: prevCam.x + (px - prevCam.x) * k,
+        y: prevCam.y + (py - prevCam.y) * k,
+      });
     }
 
     el.addEventListener('wheel', handleWheel, { passive: false });
@@ -299,7 +321,9 @@ export function CanvasView({ tasks }: CanvasViewProps) {
     if (!trimmedQuery) return true;
     if (task.title.toLowerCase().includes(trimmedQuery)) return true;
     if (task.notes.toLowerCase().includes(trimmedQuery)) return true;
-    return task.subtasks.some((subtask) => subtask.title.toLowerCase().includes(trimmedQuery));
+    return task.subtasks.some((subtask) =>
+      subtask.title.toLowerCase().includes(trimmedQuery)
+    );
   }
 
   return (
@@ -317,7 +341,9 @@ export function CanvasView({ tasks }: CanvasViewProps) {
         className="absolute left-1/2 top-1/2 h-0 w-0"
         style={{
           transform: `translate(${cam.x}px, ${cam.y}px) scale(${zoom})`,
-          transition: camAnim ? 'transform 520ms cubic-bezier(.3,1.02,.36,1)' : 'none',
+          transition: camAnim
+            ? 'transform 520ms cubic-bezier(.3,1.02,.36,1)'
+            : 'none',
         }}
       >
         <div
@@ -415,7 +441,10 @@ export function CanvasView({ tasks }: CanvasViewProps) {
             onToggleSubtask={(id) => {
               const subtask = openTask.subtasks.find((s) => s.id === id);
               if (subtask) {
-                updateSubtask.mutate({ id, updates: { completed: !subtask.completed } });
+                updateSubtask.mutate({
+                  id,
+                  updates: { completed: !subtask.completed },
+                });
               }
             }}
             // Deliberately not also calling closeTask() here: that sets

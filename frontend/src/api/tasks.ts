@@ -68,13 +68,15 @@ function assertTaskArray(value: unknown): Task[] {
 }
 
 function assertSubtask(value: unknown): Subtask {
-  if (!isSubtask(value)) throw new Error('Malformed subtask response from server');
+  if (!isSubtask(value))
+    throw new Error('Malformed subtask response from server');
   return value;
 }
 
 export async function fetchTasks(): Promise<Task[]> {
   const response = await fetch(`${API_URL}/tasks`);
-  if (!response.ok) throw new Error(`Failed to fetch tasks: ${response.status}`);
+  if (!response.ok)
+    throw new Error(`Failed to fetch tasks: ${response.status}`);
   return assertTaskArray(await response.json());
 }
 
@@ -84,7 +86,8 @@ export async function createTask(title: string): Promise<Task> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title }),
   });
-  if (!response.ok) throw new Error(`Failed to create task: ${response.status}`);
+  if (!response.ok)
+    throw new Error(`Failed to create task: ${response.status}`);
   return assertTask(await response.json());
 }
 
@@ -97,7 +100,8 @@ export async function updateTask(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),
   });
-  if (!response.ok) throw new Error(`Failed to update task: ${response.status}`);
+  if (!response.ok)
+    throw new Error(`Failed to update task: ${response.status}`);
   return assertTask(await response.json());
 }
 
@@ -111,7 +115,8 @@ export async function createSubtask(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title, ...position }),
   });
-  if (!response.ok) throw new Error(`Failed to create subtask: ${response.status}`);
+  if (!response.ok)
+    throw new Error(`Failed to create subtask: ${response.status}`);
   return assertSubtask(await response.json());
 }
 
@@ -124,7 +129,8 @@ export async function updateSubtask(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),
   });
-  if (!response.ok) throw new Error(`Failed to update subtask: ${response.status}`);
+  if (!response.ok)
+    throw new Error(`Failed to update subtask: ${response.status}`);
   return assertSubtask(await response.json());
 }
 
@@ -132,7 +138,8 @@ export async function deleteSubtask(id: number): Promise<void> {
   const response = await fetch(`${API_URL}/subtasks/${id}`, {
     method: 'DELETE',
   });
-  if (!response.ok) throw new Error(`Failed to delete subtask: ${response.status}`);
+  if (!response.ok)
+    throw new Error(`Failed to delete subtask: ${response.status}`);
 }
 
 export async function deleteTask(id: number) {
@@ -140,5 +147,6 @@ export async function deleteTask(id: number) {
     method: 'DELETE',
   });
 
-  if (!response.ok) throw new Error(`Failed to delete task: ${response.status}`);
+  if (!response.ok)
+    throw new Error(`Failed to delete task: ${response.status}`);
 }
