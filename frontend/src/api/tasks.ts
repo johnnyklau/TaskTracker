@@ -25,6 +25,10 @@ export type Task = {
   subtasks: Subtask[];
 };
 
+// PATCH /tasks/:id returns the task row without `subtasks` (only GET/POST
+// include it) — see the merge in useUpdateTask's onSuccess.
+type TaskWithoutSubtasks = Omit<Task, 'subtasks'>;
+
 function isSubtask(value: unknown): value is Subtask {
   if (typeof value !== 'object' || value === null) return false;
   const s = value as Record<string, unknown>;
@@ -39,7 +43,7 @@ function isSubtask(value: unknown): value is Subtask {
   );
 }
 
-function isTask(value: unknown): value is Task {
+function isTaskWithoutSubtasks(value: unknown): value is TaskWithoutSubtasks {
   if (typeof value !== 'object' || value === null) return false;
   const t = value as Record<string, unknown>;
   return (
@@ -49,14 +53,27 @@ function isTask(value: unknown): value is Task {
     typeof t.created_at === 'string' &&
     typeof t.notes === 'string' &&
     (t.x === null || typeof t.x === 'number') &&
-    (t.y === null || typeof t.y === 'number') &&
-    Array.isArray(t.subtasks) &&
-    t.subtasks.every(isSubtask)
+    (t.y === null || typeof t.y === 'number')
+  );
+}
+
+function isTask(value: unknown): value is Task {
+  return (
+    isTaskWithoutSubtasks(value) &&
+    Array.isArray((value as Task).subtasks) &&
+    (value as Task).subtasks.every(isSubtask)
   );
 }
 
 function assertTask(value: unknown): Task {
   if (!isTask(value)) throw new Error('Malformed task response from server');
+  return value;
+}
+
+function assertTaskWithoutSubtasks(value: unknown): TaskWithoutSubtasks {
+  if (!isTaskWithoutSubtasks(value)) {
+    throw new Error('Malformed task response from server');
+  }
   return value;
 }
 
@@ -94,7 +111,7 @@ export async function createTask(title: string): Promise<Task> {
 export async function updateTask(
   id: number,
   updates: Partial<Pick<Task, 'title' | 'notes' | 'x' | 'y' | 'completed'>>
-): Promise<Task> {
+): Promise<TaskWithoutSubtasks> {
   const response = await fetch(`${API_URL}/tasks/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -102,7 +119,7 @@ export async function updateTask(
   });
   if (!response.ok)
     throw new Error(`Failed to update task: ${response.status}`);
-  return assertTask(await response.json());
+  return assertTaskWithoutSubtasks(await response.json());
 }
 
 export async function createSubtask(

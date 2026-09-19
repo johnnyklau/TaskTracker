@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from 'motion/react';
 import type { Task } from '../api/tasks';
 import { CloudShape } from './CloudShape';
@@ -8,8 +9,10 @@ type TaskViewProps = {
   onClose: () => void;
   onToggleComplete: () => void;
   onToggleSubtask: (id: number) => void;
+  onDeleteSubtask: (id: number) => void;
   onDelete: () => void;
   onAddSubtask: () => void;
+  onSaveNotes: (notes: string) => void;
 };
 
 function CheckIcon({ visible }: { visible: boolean }) {
@@ -30,14 +33,45 @@ function CheckIcon({ visible }: { visible: boolean }) {
   );
 }
 
+function DeleteSubtaskIcon() {
+  return (
+    <svg
+      width="8"
+      height="8"
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    >
+      <path d="M2 2 10 10M10 2 2 10" />
+    </svg>
+  );
+}
+
 export function TaskView({
   task,
   onClose,
   onToggleComplete,
   onToggleSubtask,
+  onDeleteSubtask,
   onDelete,
   onAddSubtask,
+  onSaveNotes,
 }: TaskViewProps) {
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesDraft, setNotesDraft] = useState(task.notes);
+
+  function startEditingNotes() {
+    setNotesDraft(task.notes);
+    setEditingNotes(true);
+  }
+
+  function saveNotes() {
+    onSaveNotes(notesDraft.trim());
+    setEditingNotes(false);
+  }
+
   return (
     <>
       <motion.div
@@ -71,31 +105,72 @@ export function TaskView({
             <div className="text-[13px] font-semibold tracking-[.14em] text-[#B08A55] uppercase">
               Notes
             </div>
-            <div className="text-[clamp(13px,1.5vw,17px)] leading-[1.45] text-ink-soft text-pretty">
-              {task.notes || 'No notes yet.'}
-            </div>
+            {editingNotes ? (
+              <div className="flex w-full max-w-[420px] flex-col items-center gap-2">
+                <textarea
+                  autoFocus
+                  value={notesDraft}
+                  onChange={(e) => setNotesDraft(e.target.value)}
+                  rows={3}
+                  className="w-full resize-none rounded-2xl border-[1.5px] border-[#EBD9C4] bg-[#FFFDFA] p-2.5 text-[clamp(13px,1.5vw,17px)] leading-[1.45] text-ink-soft outline-none focus:border-outline"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={saveNotes}
+                    className="rounded-full border-[1.5px] border-outline bg-[#FFFDFA] px-3.5 py-1 text-[13px] font-semibold text-[#6B5844] transition-colors duration-220 hover:border-done"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingNotes(false)}
+                    className="rounded-full border-[1.5px] border-transparent px-3.5 py-1 text-[13px] font-medium text-ink-mute transition-colors duration-220 hover:text-ink-soft"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={startEditingNotes}
+                className="max-w-full rounded-2xl px-2 text-[clamp(13px,1.5vw,17px)] leading-[1.45] text-ink-soft text-pretty transition-colors duration-220 hover:bg-[#FFFDFA]"
+              >
+                {task.notes || 'No notes yet.'}
+              </button>
+            )}
             <div className="mt-1 flex flex-wrap justify-center gap-2">
               {task.subtasks.map((subtask) => (
-                <button
+                <div
                   key={subtask.id}
-                  onClick={() => onToggleSubtask(subtask.id)}
-                  className={`flex items-center gap-[9px] rounded-full border-[1.5px] bg-[#FFFDFA] py-[7px] pr-3.5 pl-2.5 text-[14px] font-medium transition-colors duration-220 ${
+                  className={`flex items-center gap-[9px] rounded-full border-[1.5px] bg-[#FFFDFA] py-[7px] pr-2 pl-2.5 text-[14px] font-medium transition-colors duration-220 ${
                     subtask.completed
                       ? 'border-done text-[#3C6B28]'
                       : 'border-[#EBD9C4] text-ink-soft'
                   }`}
                 >
-                  <span
-                    className={`flex h-[17px] w-[17px] flex-none items-center justify-center rounded-full border-[1.5px] ${
-                      subtask.completed
-                        ? 'border-done bg-done'
-                        : 'border-[#EBD9C4] bg-transparent'
-                    }`}
+                  <button
+                    onClick={() => onToggleSubtask(subtask.id)}
+                    className="flex items-center gap-[9px]"
                   >
-                    <CheckIcon visible={subtask.completed} />
-                  </span>
-                  {subtask.title}
-                </button>
+                    <span
+                      className={`flex h-[17px] w-[17px] flex-none items-center justify-center rounded-full border-[1.5px] ${
+                        subtask.completed
+                          ? 'border-done bg-done'
+                          : 'border-[#EBD9C4] bg-transparent'
+                      }`}
+                    >
+                      <CheckIcon visible={subtask.completed} />
+                    </span>
+                    {subtask.title}
+                  </button>
+                  <button
+                    onClick={() => onDeleteSubtask(subtask.id)}
+                    title="Delete subtask"
+                    aria-label={`Delete subtask ${subtask.title}`}
+                    className="flex h-[17px] w-[17px] flex-none items-center justify-center rounded-full text-ink-mute transition-colors duration-220 hover:bg-[#FBEAE3] hover:text-[#B8492E]"
+                  >
+                    <DeleteSubtaskIcon />
+                  </button>
+                </div>
               ))}
               <button
                 onClick={onAddSubtask}

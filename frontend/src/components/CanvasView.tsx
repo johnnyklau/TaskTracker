@@ -5,6 +5,7 @@ import type { Task } from '../api/tasks';
 import {
   useAddSubtask,
   useAddTask,
+  useDeleteSubtask,
   useDeleteTask,
   useMoveSubtask,
   useMoveTask,
@@ -88,6 +89,7 @@ export function CanvasView({ tasks }: CanvasViewProps) {
   const updateSubtask = useUpdateSubtask();
   const addTask = useAddTask();
   const deleteTask = useDeleteTask();
+  const deleteSubtask = useDeleteSubtask();
   const addSubtask = useAddSubtask();
 
   const [cam, setCam] = useState<Cam>({ x: 0, y: 0 });
@@ -447,6 +449,10 @@ export function CanvasView({ tasks }: CanvasViewProps) {
                 });
               }
             }}
+            onDeleteSubtask={(id) => deleteSubtask.mutate(id)}
+            onSaveNotes={(notes) =>
+              updateTask.mutate({ id: openTask.id, updates: { notes } })
+            }
             // Deliberately not also calling closeTask() here: that sets
             // openTaskId=null synchronously, one commit *before* the delete
             // mutation's optimistic update removes the task from `tasks`

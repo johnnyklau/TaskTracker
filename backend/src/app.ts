@@ -14,6 +14,7 @@ app.use(
     origin: (origin, callback) => {
       const allowed = [
         'http://localhost:5173',
+        'http://localhost:5174',
         'https://tasktracker-hsy.vercel.app/',
       ];
       if (
