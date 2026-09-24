@@ -1,3 +1,5 @@
+-- Added task data and subtask data for frontend update
+
 ALTER TABLE tasks
   ADD COLUMN notes TEXT NOT NULL DEFAULT '',
   ADD COLUMN x REAL,

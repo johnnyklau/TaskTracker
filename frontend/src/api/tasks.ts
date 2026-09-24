@@ -1,8 +1,10 @@
+import { loadStoredAuth, saveStoredAuth } from './authStorage';
+
 const envApiUrl = import.meta.env.VITE_API_URL;
 if (!envApiUrl && import.meta.env.PROD) {
   throw new Error('VITE_API_URL must be set in production builds');
 }
-const API_URL = envApiUrl || 'http://localhost:3000';
+export const API_URL = envApiUrl || 'http://localhost:3000';
 
 export type Subtask = {
   id: number;
@@ -25,8 +27,11 @@ export type Task = {
   subtasks: Subtask[];
 };
 
-// PATCH /tasks/:id returns the task row without `subtasks` (only GET/POST
-// include it) — see the merge in useUpdateTask's onSuccess.
+function authHeaders(): HeadersInit {
+  const { accessToken } = loadStoredAuth();
+  return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+}
+
 type TaskWithoutSubtasks = Omit<Task, 'subtasks'>;
 
 function isSubtask(value: unknown): value is Subtask {
@@ -90,15 +95,68 @@ function assertSubtask(value: unknown): Subtask {
   return value;
 }
 
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  const { refreshToken, user } = loadStoredAuth();
+  if (!refreshToken || !user) return null;
+
+  try {
+    const response = await fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    saveStoredAuth({
+      user,
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken,
+    });
+    return data.accessToken;
+  } catch {
+    return null;
+  }
+}
+
+async function authFetch(
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const response = await fetch(url, {
+    ...options,
+    headers: { ...options.headers, ...authHeaders() },
+  });
+  if (response.status !== 401) return response;
+
+  if (!refreshPromise) {
+    refreshPromise = refreshAccessToken().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  const newAccessToken = await refreshPromise;
+
+  if (!newAccessToken) {
+    window.dispatchEvent(new Event('auth:expired'));
+    return response;
+  }
+
+  return fetch(url, {
+    ...options,
+    headers: { ...options.headers, ...authHeaders() },
+  });
+}
+
 export async function fetchTasks(): Promise<Task[]> {
-  const response = await fetch(`${API_URL}/tasks`);
+  const response = await authFetch(`${API_URL}/tasks`);
   if (!response.ok)
     throw new Error(`Failed to fetch tasks: ${response.status}`);
   return assertTaskArray(await response.json());
 }
 
 export async function createTask(title: string): Promise<Task> {
-  const response = await fetch(`${API_URL}/tasks`, {
+  const response = await authFetch(`${API_URL}/tasks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title }),
@@ -112,7 +170,7 @@ export async function updateTask(
   id: number,
   updates: Partial<Pick<Task, 'title' | 'notes' | 'x' | 'y' | 'completed'>>
 ): Promise<TaskWithoutSubtasks> {
-  const response = await fetch(`${API_URL}/tasks/${id}`, {
+  const response = await authFetch(`${API_URL}/tasks/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),
@@ -127,7 +185,7 @@ export async function createSubtask(
   title: string,
   position?: { dx: number; dy: number }
 ): Promise<Subtask> {
-  const response = await fetch(`${API_URL}/tasks/${taskId}/subtasks`, {
+  const response = await authFetch(`${API_URL}/tasks/${taskId}/subtasks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title, ...position }),
@@ -141,7 +199,7 @@ export async function updateSubtask(
   id: number,
   updates: Partial<Pick<Subtask, 'title' | 'completed' | 'dx' | 'dy'>>
 ): Promise<Subtask> {
-  const response = await fetch(`${API_URL}/subtasks/${id}`, {
+  const response = await authFetch(`${API_URL}/subtasks/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),
@@ -152,7 +210,7 @@ export async function updateSubtask(
 }
 
 export async function deleteSubtask(id: number): Promise<void> {
-  const response = await fetch(`${API_URL}/subtasks/${id}`, {
+  const response = await authFetch(`${API_URL}/subtasks/${id}`, {
     method: 'DELETE',
   });
   if (!response.ok)
@@ -160,7 +218,7 @@ export async function deleteSubtask(id: number): Promise<void> {
 }
 
 export async function deleteTask(id: number) {
-  const response = await fetch(`${API_URL}/tasks/${id}`, {
+  const response = await authFetch(`${API_URL}/tasks/${id}`, {
     method: 'DELETE',
   });
 

@@ -5,6 +5,7 @@ services:
       - '3000:3000'
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/tasktracker
+      - JWT_SECRET=replacethiswitharandomlongstring
     depends_on:
       - postgres
 

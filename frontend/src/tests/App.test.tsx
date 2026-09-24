@@ -1,12 +1,15 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import App from './App';
+import App from '../App';
 import { vi } from 'vitest';
-import * as api from './api/tasks';
-import type { Task } from './api/tasks';
+import * as api from '../api/tasks';
+import type { Task } from '../api/tasks';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import * as AuthContext from '../context/useAuth';
 
-vi.mock('./api/tasks');
+vi.mock('../api/tasks');
+
+vi.mock('../context/useAuth');
 
 function renderWithClient(ui: React.ReactElement) {
   const queryClient = new QueryClient({
@@ -36,6 +39,14 @@ function makeTask(overrides: Partial<Task> = {}): Task {
 
 describe('App', () => {
   it('renders one cloud per task', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue({
+      user: { id: 1, email: 'test@example.com' },
+      accessToken: 'fake-token',
+      refreshToken: 'fake-refresh-token',
+      login: vi.fn(),
+      signup: vi.fn(),
+      logout: vi.fn(),
+    });
     vi.mocked(api.fetchTasks).mockResolvedValue([
       makeTask({ id: 1, title: 'Buy milk', x: -200, y: 0 }),
       makeTask({ id: 2, title: 'Walk the cat', x: 200, y: 0 }),
@@ -52,6 +63,14 @@ describe('App', () => {
   });
 
   it('clicking a cloud opens TaskView with the right title', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue({
+      user: { id: 1, email: 'test@example.com' },
+      accessToken: 'fake-token',
+      refreshToken: 'fake-refresh-token',
+      login: vi.fn(),
+      signup: vi.fn(),
+      logout: vi.fn(),
+    });
     const user = userEvent.setup();
     vi.mocked(api.fetchTasks).mockResolvedValue([
       makeTask({ title: 'Pet the cat' }),
@@ -68,6 +87,14 @@ describe('App', () => {
   });
 
   it('fires the update mutation when toggling complete in TaskView', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue({
+      user: { id: 1, email: 'test@example.com' },
+      accessToken: 'fake-token',
+      refreshToken: 'fake-refresh-token',
+      login: vi.fn(),
+      signup: vi.fn(),
+      logout: vi.fn(),
+    });
     const user = userEvent.setup();
     const task = makeTask({ id: 3, title: 'Pet the cat', completed: false });
     vi.mocked(api.fetchTasks).mockResolvedValue([task]);
@@ -86,6 +113,14 @@ describe('App', () => {
   });
 
   it('fires the delete mutation and closes TaskView when deleting a task', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue({
+      user: { id: 1, email: 'test@example.com' },
+      accessToken: 'fake-token',
+      refreshToken: 'fake-refresh-token',
+      login: vi.fn(),
+      signup: vi.fn(),
+      logout: vi.fn(),
+    });
     const user = userEvent.setup();
     const task = makeTask({ id: 7, title: 'Pet the cat' });
     vi.mocked(api.fetchTasks).mockResolvedValue([task]);
@@ -107,6 +142,14 @@ describe('App', () => {
   });
 
   it('debounces drag position updates into a single mutation call, not one per move', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue({
+      user: { id: 1, email: 'test@example.com' },
+      accessToken: 'fake-token',
+      refreshToken: 'fake-refresh-token',
+      login: vi.fn(),
+      signup: vi.fn(),
+      logout: vi.fn(),
+    });
     const task = makeTask({
       id: 5,
       title: 'Ship the drag-canvas prototype',
@@ -124,8 +167,6 @@ describe('App', () => {
     vi.useFakeTimers();
     try {
       fireEvent.pointerDown(cloud, { clientX: 100, clientY: 100 });
-      // Past the 4px drag-vs-click threshold, and beyond a single move —
-      // only the debounced final position should ever reach the API.
       fireEvent.pointerMove(window, { clientX: 130, clientY: 110 });
       fireEvent.pointerMove(window, { clientX: 150, clientY: 130 });
       fireEvent.pointerMove(window, { clientX: 180, clientY: 180 });
@@ -138,5 +179,22 @@ describe('App', () => {
 
     expect(api.updateTask).toHaveBeenCalledTimes(1);
     expect(api.updateTask).toHaveBeenCalledWith(5, { x: 80, y: 80 });
+  });
+
+  it('logs out automatically when an auth:expired event fires', () => {
+    const logout = vi.fn();
+    vi.mocked(AuthContext.useAuth).mockReturnValue({
+      user: { id: 1, email: 'HSY@example.com' },
+      accessToken: 'fake-token',
+      refreshToken: 'fake-refresh-token',
+      login: vi.fn(),
+      signup: vi.fn(),
+      logout,
+    });
+    vi.mocked(api.fetchTasks).mockResolvedValue([]);
+
+    renderWithClient(<App />);
+    window.dispatchEvent(new Event('auth:expired'));
+    expect(logout).toHaveBeenCalled();
   });
 });
