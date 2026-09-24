@@ -12,7 +12,8 @@ describe('AuthForm', () => {
     const login = vi.fn().mockResolvedValue(undefined);
     vi.mocked(AuthContext.useAuth).mockReturnValue({
       user: null,
-      token: null,
+      accessToken: null,
+      refreshToken: null,
       login,
       signup: vi.fn(),
       logout: vi.fn(),
@@ -30,7 +31,8 @@ describe('AuthForm', () => {
     const signup = vi.fn().mockResolvedValue(undefined);
     vi.mocked(AuthContext.useAuth).mockReturnValue({
       user: null,
-      token: null,
+      accessToken: null,
+      refreshToken: null,
       login: vi.fn(),
       signup,
       logout: vi.fn(),
@@ -51,7 +53,8 @@ describe('AuthForm', () => {
       .mockRejectedValue(new Error('Invalid email or password'));
     vi.mocked(AuthContext.useAuth).mockReturnValue({
       user: null,
-      token: null,
+      accessToken: null,
+      refreshToken: null,
       login,
       signup: vi.fn(),
       logout: vi.fn(),
@@ -77,7 +80,8 @@ describe('AuthForm', () => {
     );
     vi.mocked(AuthContext.useAuth).mockReturnValue({
       user: null,
-      token: null,
+      accessToken: null,
+      refreshToken: null,
       login,
       signup: vi.fn(),
       logout: vi.fn(),

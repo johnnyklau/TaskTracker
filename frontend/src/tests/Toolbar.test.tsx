@@ -11,7 +11,8 @@ describe('Toolbar + AccountMenu interaction', () => {
     const user = userEvent.setup();
     vi.mocked(AuthContext.useAuth).mockReturnValue({
       user: { id: 1, email: 'test@example.com' },
-      token: 'fake-token',
+      accessToken: 'fake-token',
+      refreshToken: 'fake-refresh-token',
       login: vi.fn(),
       signup: vi.fn(),
       logout: vi.fn(),

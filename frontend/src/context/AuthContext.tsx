@@ -7,7 +7,7 @@ import {
   clearStoredAuth,
 } from '../api/authStorage';
 import { API_URL } from '../api/tasks';
-import { AuthContext } from './authContext';
+import { AuthContext } from './useAuth';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [{ user, accessToken, refreshToken }, setAuth] =

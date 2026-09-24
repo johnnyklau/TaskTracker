@@ -41,7 +41,8 @@ describe('App', () => {
   it('renders one cloud per task', async () => {
     vi.mocked(AuthContext.useAuth).mockReturnValue({
       user: { id: 1, email: 'test@example.com' },
-      token: 'fake-token',
+      accessToken: 'fake-token',
+      refreshToken: 'fake-refresh-token',
       login: vi.fn(),
       signup: vi.fn(),
       logout: vi.fn(),
@@ -64,7 +65,8 @@ describe('App', () => {
   it('clicking a cloud opens TaskView with the right title', async () => {
     vi.mocked(AuthContext.useAuth).mockReturnValue({
       user: { id: 1, email: 'test@example.com' },
-      token: 'fake-token',
+      accessToken: 'fake-token',
+      refreshToken: 'fake-refresh-token',
       login: vi.fn(),
       signup: vi.fn(),
       logout: vi.fn(),
@@ -87,7 +89,8 @@ describe('App', () => {
   it('fires the update mutation when toggling complete in TaskView', async () => {
     vi.mocked(AuthContext.useAuth).mockReturnValue({
       user: { id: 1, email: 'test@example.com' },
-      token: 'fake-token',
+      accessToken: 'fake-token',
+      refreshToken: 'fake-refresh-token',
       login: vi.fn(),
       signup: vi.fn(),
       logout: vi.fn(),
@@ -112,7 +115,8 @@ describe('App', () => {
   it('fires the delete mutation and closes TaskView when deleting a task', async () => {
     vi.mocked(AuthContext.useAuth).mockReturnValue({
       user: { id: 1, email: 'test@example.com' },
-      token: 'fake-token',
+      accessToken: 'fake-token',
+      refreshToken: 'fake-refresh-token',
       login: vi.fn(),
       signup: vi.fn(),
       logout: vi.fn(),
@@ -140,7 +144,8 @@ describe('App', () => {
   it('debounces drag position updates into a single mutation call, not one per move', async () => {
     vi.mocked(AuthContext.useAuth).mockReturnValue({
       user: { id: 1, email: 'test@example.com' },
-      token: 'fake-token',
+      accessToken: 'fake-token',
+      refreshToken: 'fake-refresh-token',
       login: vi.fn(),
       signup: vi.fn(),
       logout: vi.fn(),
@@ -180,7 +185,8 @@ describe('App', () => {
     const logout = vi.fn();
     vi.mocked(AuthContext.useAuth).mockReturnValue({
       user: { id: 1, email: 'HSY@example.com' },
-      token: 'fake-token',
+      accessToken: 'fake-token',
+      refreshToken: 'fake-refresh-token',
       login: vi.fn(),
       signup: vi.fn(),
       logout,
