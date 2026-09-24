@@ -1,8 +1,22 @@
-import { useTasks } from './hooks/useTasks';
+import { useEffect } from 'react';
+import { AuthForm } from './components/AuthForm';
 import { CanvasView } from './components/CanvasView';
+import { useAuth } from './context/AuthContext';
+import { useTasks } from './hooks/useTasks';
 
 function App() {
+  const { user, logout } = useAuth();
+
+  useEffect(() => {
+    window.addEventListener('auth:expired', logout);
+    return () => window.removeEventListener('auth:expired', logout);
+  }, [logout]);
+
   const { data: tasks = [], isPending, isError } = useTasks();
+
+  if (!user) {
+    return <AuthForm />;
+  }
 
   if (isPending) {
     return <div className="h-full min-h-140 w-full bg-canvas" />;
