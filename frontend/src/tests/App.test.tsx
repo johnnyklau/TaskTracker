@@ -5,11 +5,11 @@ import { vi } from 'vitest';
 import * as api from '../api/tasks';
 import type { Task } from '../api/tasks';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import * as AuthContext from '../context/AuthContext';
+import * as AuthContext from '../context/useAuth';
 
 vi.mock('../api/tasks');
 
-vi.mock('../context/AuthContext');
+vi.mock('../context/useAuth');
 
 function renderWithClient(ui: React.ReactElement) {
   const queryClient = new QueryClient({

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { AuthForm } from './components/AuthForm';
 import { CanvasView } from './components/CanvasView';
-import { useAuth } from './context/AuthContext';
+import { useAuth } from './context/useAuth';
 import { useTasks } from './hooks/useTasks';
 
 function App() {

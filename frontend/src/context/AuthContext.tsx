@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { login as apiLogin, signup as apiSignup, type User } from '../api/auth';
 import {
@@ -7,17 +7,7 @@ import {
   clearStoredAuth,
 } from '../api/authStorage';
 import { API_URL } from '../api/tasks';
-
-type AuthContextValue = {
-  user: User | null;
-  accessToken: string | null;
-  refreshToken: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-};
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+import { AuthContext } from './authContext';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [{ user, accessToken, refreshToken }, setAuth] =
@@ -63,12 +53,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 }

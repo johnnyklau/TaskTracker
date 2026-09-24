@@ -2,8 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
 import app from '../app';
 import pool from '../db/pool';
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
 import { createTestUser } from './testHelpers';
 
 beforeEach(async () => {

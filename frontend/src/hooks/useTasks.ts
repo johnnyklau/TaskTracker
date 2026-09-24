@@ -17,7 +17,7 @@ import {
   type Subtask,
   type Task,
 } from '../api/tasks';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 
 const tasksKey = ['tasks'] as const; // TODO: Query key factory??
 

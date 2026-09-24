@@ -2,9 +2,9 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { AuthForm } from '../components/AuthForm';
-import * as AuthContext from '../context/AuthContext';
+import * as AuthContext from '../context/useAuth';
 
-vi.mock('../context/AuthContext');
+vi.mock('../context/useAuth');
 
 describe('AuthForm', () => {
   it('calls login with the entered credentials by default', async () => {

@@ -2,9 +2,9 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { Toolbar } from '../components/Toolbar';
-import * as AuthContext from '../context/AuthContext';
+import * as AuthContext from '../context/useAuth';
 
-vi.mock('../context/AuthContext');
+vi.mock('../context/useAuth');
 
 describe('Toolbar + AccountMenu interaction', () => {
   it('closes the account menu when clicking a different toolbar button', async () => {
