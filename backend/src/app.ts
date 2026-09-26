@@ -9,6 +9,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { authenticate } from './middleware/authenticate';
 import crypto from 'crypto';
+import { Pool, PoolClient } from 'pg';
 
 const app = express();
 app.disable('x-powered-by');
@@ -20,13 +21,9 @@ app.use(
       const allowed = [
         'http://localhost:5173',
         'http://localhost:5174',
-        'https://tasktracker-hsy.vercel.app/',
+        'https://tasktracker-hsy.vercel.app',
       ];
-      if (
-        !origin ||
-        allowed.includes(origin) ||
-        /\.vercel\.app$/.test(origin) //TODO: Overly permissive
-      ) {
+      if (!origin || allowed.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
@@ -36,12 +33,29 @@ app.use(
 );
 app.use(express.json());
 
-const limiter = rateLimit({
+const skipInTest = () => process.env.NODE_ENV === 'test';
+
+const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
+  skip: skipInTest,
 });
 
-app.use(limiter);
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  skip: skipInTest,
+  message: { error: 'Too many attempts, please try again later' },
+});
+
+app.set('trust proxy', 1);
+
+app.use('/auth/signup', authLimiter);
+app.use('/auth/login', authLimiter);
+app.use('/auth/refresh', authLimiter);
+
+app.use('/tasks', apiLimiter);
+app.use('/subtasks', apiLimiter);
 
 function generateRefreshToken(): string {
   return crypto.randomBytes(32).toString('hex');
@@ -51,7 +65,7 @@ function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-async function issueTokens(userId: number) {
+async function issueTokens(db: Pool | PoolClient, userId: number) {
   const accessToken = jwt.sign({ userId }, process.env.JWT_SECRET!, {
     expiresIn: '15m',
   });
@@ -59,7 +73,7 @@ async function issueTokens(userId: number) {
   const refreshTokenHash = hashToken(refreshToken);
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-  await pool.query(
+  await db.query(
     'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
     [userId, refreshTokenHash, expiresAt]
   );
@@ -124,7 +138,7 @@ app.post('/auth/signup', async (req, res) => {
     );
 
     const user = result.rows[0];
-    const { accessToken, refreshToken } = await issueTokens(user.id);
+    const { accessToken, refreshToken } = await issueTokens(pool, user.id);
 
     res.status(201).json({
       accessToken,
@@ -164,7 +178,7 @@ app.post('/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    const { accessToken, refreshToken } = await issueTokens(user.id);
+    const { accessToken, refreshToken } = await issueTokens(pool, user.id);
 
     res.status(200).json({
       accessToken,
@@ -206,37 +220,50 @@ app.post('/auth/refresh', async (req, res) => {
   }
 
   const tokenHash = hashToken(refreshToken);
+  let client: PoolClient | undefined;
 
   try {
-    const result = await pool.query(
-      'SELECT id, user_id, expires_at, revoked_at FROM refresh_tokens WHERE token_hash = $1',
+    client = await pool.connect();
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `UPDATE refresh_tokens
+   SET revoked_at = NOW()
+   WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > NOW()
+   RETURNING user_id`,
       [tokenHash]
     );
+
     if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
+
+      const reuseCheck = await client.query(
+        `SELECT user_id FROM refresh_tokens WHERE token_hash = $1 AND revoked_at IS NOT NULL AND revoked_at < NOW() - interval '10 seconds'`,
+        [tokenHash]
+      );
+
+      if (reuseCheck.rows.length > 0) {
+        await client.query(
+          'UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL',
+          [reuseCheck.rows[0].user_id]
+        );
+      }
+
       return res.status(401).json({ error: 'Invalid refresh token' });
     }
-
-    const stored = result.rows[0];
-
-    if (
-      stored.revoked_at !== null ||
-      new Date(stored.expires_at) < new Date()
-    ) {
-      return res.status(401).json({ error: 'Invalid refresh token' });
-    }
-
-    await pool.query(
-      'UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1',
-      [stored.id]
-    );
 
     const { accessToken, refreshToken: newRefreshToken } = await issueTokens(
-      stored.user_id
+      client,
+      result.rows[0].user_id
     );
+    await client.query('COMMIT');
     res.status(200).json({ accessToken, refreshToken: newRefreshToken });
   } catch (err) {
+    if (client) await client.query('ROLLBACK');
     console.error(err);
     res.status(500).json({ error: 'Failed to refresh token' });
+  } finally {
+    client?.release();
   }
 });
 

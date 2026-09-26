@@ -36,11 +36,24 @@ type Cam = { x: number; y: number };
 
 const GOLDEN_ANGLE_DEG = 137.508;
 
-/** Spiral placement for tasks that have never been positioned (x/y null). */
-function autoPlacement(index: number): { x: number; y: number } {
-  const angle = (index * GOLDEN_ANGLE_DEG * Math.PI) / 180;
-  const radius = 120 * Math.sqrt(index + 1);
-  return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
+/** Collision-avoiding spiral placement for a task that's never been positioned. */
+function findTaskPlacement(existing: { x: number; y: number }[]): {
+  x: number;
+  y: number;
+} {
+  const minDistance = MAIN_CLOUD_WIDTH * 1.05;
+  const collides = (x: number, y: number) =>
+    existing.some((t) => Math.hypot(t.x - x, t.y - y) < minDistance);
+
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const angle = (attempt * GOLDEN_ANGLE_DEG * Math.PI) / 180;
+    const radius = 120 * Math.sqrt(attempt + 1);
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    if (!collides(x, y)) return { x, y };
+  }
+
+  return { x: existing.length * minDistance, y: 0 };
 }
 
 /**
@@ -194,12 +207,17 @@ export function CanvasView({ tasks }: CanvasViewProps) {
   // yet server-side. Once useAddTask's onSuccess swaps in the real task
   // (still x/y null), this effect picks it up and places it for real.
   useEffect(() => {
-    tasks.forEach((task, index) => {
+    tasks.forEach((task) => {
       if (task.x !== null && task.y !== null) return;
       if (task.id < 0) return;
       if (placedRef.current.has(task.id)) return;
       placedRef.current.add(task.id);
-      const { x, y } = autoPlacement(index);
+
+      const existingPositions = tasks
+        .filter((t) => t.id !== task.id && t.x !== null && t.y !== null)
+        .map((t) => ({ x: t.x!, y: t.y! }));
+
+      const { x, y } = findTaskPlacement(existingPositions);
       moveTask(task.id, x, y);
     });
   }, [tasks, moveTask]);
