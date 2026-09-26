@@ -9,6 +9,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { authenticate } from './middleware/authenticate';
 import crypto from 'crypto';
+import { Pool, PoolClient } from 'pg';
 
 const app = express();
 app.disable('x-powered-by');
@@ -20,13 +21,9 @@ app.use(
       const allowed = [
         'http://localhost:5173',
         'http://localhost:5174',
-        'https://tasktracker-hsy.vercel.app/',
+        'https://tasktracker-hsy.vercel.app',
       ];
-      if (
-        !origin ||
-        allowed.includes(origin) ||
-        /\.vercel\.app$/.test(origin) //TODO: Overly permissive
-      ) {
+      if (!origin || allowed.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
@@ -36,12 +33,30 @@ app.use(
 );
 app.use(express.json());
 
-const limiter = rateLimit({
+const skipInTest = () => process.env.NODE_ENV === 'test';
+
+const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
+  skip: skipInTest,
 });
 
-app.use(limiter);
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  skip: skipInTest,
+  message: { error: 'Too many attempts, please try again later' },
+});
+
+// Separate from authLimiter so failed logins can't block token refresh.
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  skip: skipInTest,
+  message: { error: 'Too many attempts, please try again later' },
+});
+
+app.set('trust proxy', 1);
 
 function generateRefreshToken(): string {
   return crypto.randomBytes(32).toString('hex');
@@ -51,7 +66,7 @@ function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-async function issueTokens(userId: number) {
+async function issueTokens(db: Pool | PoolClient, userId: number) {
   const accessToken = jwt.sign({ userId }, process.env.JWT_SECRET!, {
     expiresIn: '15m',
   });
@@ -59,7 +74,7 @@ async function issueTokens(userId: number) {
   const refreshTokenHash = hashToken(refreshToken);
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-  await pool.query(
+  await db.query(
     'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
     [userId, refreshTokenHash, expiresAt]
   );
@@ -72,7 +87,7 @@ app.get('/health', async (req, res) => {
 });
 
 // TODO: No pagination , currently just a full bulk get.
-app.get('/tasks', authenticate, async (req, res) => {
+app.get('/tasks', apiLimiter, authenticate, async (req, res) => {
   try {
     const tasksResult = await pool.query(
       'SELECT * FROM tasks WHERE user_id = $1 ORDER BY created_at DESC',
@@ -102,7 +117,7 @@ app.get('/tasks', authenticate, async (req, res) => {
   }
 });
 
-app.post('/auth/signup', async (req, res) => {
+app.post('/auth/signup', authLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || typeof email !== 'string') {
@@ -124,7 +139,7 @@ app.post('/auth/signup', async (req, res) => {
     );
 
     const user = result.rows[0];
-    const { accessToken, refreshToken } = await issueTokens(user.id);
+    const { accessToken, refreshToken } = await issueTokens(pool, user.id);
 
     res.status(201).json({
       accessToken,
@@ -140,7 +155,7 @@ app.post('/auth/signup', async (req, res) => {
   }
 });
 
-app.post('/auth/login', async (req, res) => {
+app.post('/auth/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -164,7 +179,7 @@ app.post('/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    const { accessToken, refreshToken } = await issueTokens(user.id);
+    const { accessToken, refreshToken } = await issueTokens(pool, user.id);
 
     res.status(200).json({
       accessToken,
@@ -177,7 +192,7 @@ app.post('/auth/login', async (req, res) => {
   }
 });
 
-app.post('/auth/logout', async (req, res) => {
+app.post('/auth/logout', apiLimiter, async (req, res) => {
   const { refreshToken } = req.body;
 
   if (!refreshToken || typeof refreshToken !== 'string') {
@@ -198,7 +213,7 @@ app.post('/auth/logout', async (req, res) => {
   }
 });
 
-app.post('/auth/refresh', async (req, res) => {
+app.post('/auth/refresh', refreshLimiter, async (req, res) => {
   const { refreshToken } = req.body;
 
   if (!refreshToken || typeof refreshToken !== 'string') {
@@ -206,41 +221,54 @@ app.post('/auth/refresh', async (req, res) => {
   }
 
   const tokenHash = hashToken(refreshToken);
+  let client: PoolClient | undefined;
 
   try {
-    const result = await pool.query(
-      'SELECT id, user_id, expires_at, revoked_at FROM refresh_tokens WHERE token_hash = $1',
+    client = await pool.connect();
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `UPDATE refresh_tokens
+   SET revoked_at = NOW()
+   WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > NOW()
+   RETURNING user_id`,
       [tokenHash]
     );
+
     if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
+
+      const reuseCheck = await client.query(
+        `SELECT user_id FROM refresh_tokens WHERE token_hash = $1 AND revoked_at IS NOT NULL AND revoked_at < NOW() - interval '10 seconds'`,
+        [tokenHash]
+      );
+
+      if (reuseCheck.rows.length > 0) {
+        await client.query(
+          'UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL',
+          [reuseCheck.rows[0].user_id]
+        );
+      }
+
       return res.status(401).json({ error: 'Invalid refresh token' });
     }
-
-    const stored = result.rows[0];
-
-    if (
-      stored.revoked_at !== null ||
-      new Date(stored.expires_at) < new Date()
-    ) {
-      return res.status(401).json({ error: 'Invalid refresh token' });
-    }
-
-    await pool.query(
-      'UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1',
-      [stored.id]
-    );
 
     const { accessToken, refreshToken: newRefreshToken } = await issueTokens(
-      stored.user_id
+      client,
+      result.rows[0].user_id
     );
+    await client.query('COMMIT');
     res.status(200).json({ accessToken, refreshToken: newRefreshToken });
   } catch (err) {
+    if (client) await client.query('ROLLBACK');
     console.error(err);
     res.status(500).json({ error: 'Failed to refresh token' });
+  } finally {
+    client?.release();
   }
 });
 
-app.post('/tasks', authenticate, async (req, res) => {
+app.post('/tasks', apiLimiter, authenticate, async (req, res) => {
   const { title } = req.body;
 
   if (!title) {
@@ -274,6 +302,7 @@ app.post('/tasks', authenticate, async (req, res) => {
 
 app.post(
   '/tasks/:id/subtasks',
+  apiLimiter,
   authenticate,
   async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
@@ -325,6 +354,7 @@ app.post(
 
 app.patch(
   '/tasks/:id',
+  apiLimiter,
   authenticate,
   async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
@@ -415,6 +445,7 @@ app.patch(
 
 app.patch(
   '/subtasks/:id',
+  apiLimiter,
   authenticate,
   async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
@@ -494,6 +525,7 @@ app.patch(
 
 app.delete(
   '/tasks/:id',
+  apiLimiter,
   authenticate,
   async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
@@ -522,6 +554,7 @@ app.delete(
 
 app.delete(
   '/subtasks/:id',
+  apiLimiter,
   authenticate,
   async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
