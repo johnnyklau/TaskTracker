@@ -26,3 +26,22 @@ export async function createTestUser(email = 'HSY@example.com') {
 
   return { user, accessToken, refreshToken };
 }
+
+export function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+export async function insertRefreshToken(
+  userId: number,
+  options: { expiresAt?: Date; revokedAt?: Date | null } = {}
+): Promise<string> {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const tokenHash = hashToken(rawToken);
+  const expiresAt =
+    options.expiresAt ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  await pool.query(
+    'INSERT INTO refresh_tokens (user_id, token_hash, expires_at, revoked_at) VALUES ($1, $2, $3, $4)',
+    [userId, tokenHash, expiresAt, options.revokedAt ?? null]
+  );
+  return rawToken;
+}

@@ -32,7 +32,8 @@ This is a basic to-do style app, but my aim was to ensure it was as complete as 
   image to Render, each via their respective CLI/API rather than native
   git-triggered auto-deploy, keeping the deploy step explicit and visible
 
-**Also configured:** 
+**Also configured:**
+
 - JWT access/refresh token pair with rotation and revocation
 - branch protection (CI must pass to merge)
 - Dependabot (dependency + GitHub Actions updates)
