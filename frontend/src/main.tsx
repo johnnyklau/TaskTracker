@@ -6,6 +6,7 @@ import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persi
 import App from './App';
 import './index.css';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { AuthProvider } from './context/AuthContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,8 +32,10 @@ createRoot(document.getElementById('root')!).render(
         },
       }}
     >
-      <ReactQueryDevtools />
-      <App />
+      <AuthProvider>
+        <ReactQueryDevtools />
+        <App />
+      </AuthProvider>
     </PersistQueryClientProvider>
   </StrictMode>
 );

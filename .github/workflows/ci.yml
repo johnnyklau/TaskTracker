@@ -44,6 +44,7 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tasktracker
+      JWT_SECRET: test-only-secret-do-not-use-in-production
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

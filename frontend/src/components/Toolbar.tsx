@@ -1,3 +1,5 @@
+import { AccountMenu } from './AccountMenu';
+
 type ToolbarProps = {
   draft: string;
   onDraftChange: (value: string) => void;
@@ -150,6 +152,10 @@ export function Toolbar({
           <path d="M3 8V4.6A1.6 1.6 0 0 1 4.6 3H8M14 3h3.4A1.6 1.6 0 0 1 19 4.6V8M19 14v3.4a1.6 1.6 0 0 1-1.6 1.6H14M8 19H4.6A1.6 1.6 0 0 1 3 17.4V14" />
         </svg>
       </button>
+
+      <span className="mx-1 h-[26px] w-[1.5px] bg-surface-edge" />
+
+      <AccountMenu />
     </div>
   );
 }

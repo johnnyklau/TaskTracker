@@ -1,9 +1,15 @@
 import express from 'express';
+import type { Request, Response } from 'express';
 import 'dotenv/config';
 import cors from 'cors';
 import pool from './db/pool';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { authenticate } from './middleware/authenticate';
+import crypto from 'crypto';
+import { Pool, PoolClient } from 'pg';
 
 const app = express();
 app.disable('x-powered-by');
@@ -15,13 +21,9 @@ app.use(
       const allowed = [
         'http://localhost:5173',
         'http://localhost:5174',
-        'https://tasktracker-hsy.vercel.app/',
+        'https://tasktracker-hsy.vercel.app',
       ];
-      if (
-        !origin ||
-        allowed.includes(origin) ||
-        /\.vercel\.app$/.test(origin) //TODO: Overly permissive
-      ) {
+      if (!origin || allowed.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
@@ -31,24 +33,70 @@ app.use(
 );
 app.use(express.json());
 
-const limiter = rateLimit({
+const skipInTest = () => process.env.NODE_ENV === 'test';
+
+const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
+  skip: skipInTest,
 });
 
-app.use(limiter);
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  skip: skipInTest,
+  message: { error: 'Too many attempts, please try again later' },
+});
+
+// Separate from authLimiter so failed logins can't block token refresh.
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  skip: skipInTest,
+  message: { error: 'Too many attempts, please try again later' },
+});
+
+app.set('trust proxy', 1);
+
+function generateRefreshToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+async function issueTokens(db: Pool | PoolClient, userId: number) {
+  const accessToken = jwt.sign({ userId }, process.env.JWT_SECRET!, {
+    expiresIn: '15m',
+  });
+  const refreshToken = generateRefreshToken();
+  const refreshTokenHash = hashToken(refreshToken);
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+  await db.query(
+    'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
+    [userId, refreshTokenHash, expiresAt]
+  );
+
+  return { accessToken, refreshToken };
+}
 
 app.get('/health', async (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
 // TODO: No pagination , currently just a full bulk get.
-app.get('/tasks', async (req, res) => {
+app.get('/tasks', apiLimiter, authenticate, async (req, res) => {
   try {
     const tasksResult = await pool.query(
-      'SELECT * FROM tasks ORDER BY created_at DESC'
+      'SELECT * FROM tasks WHERE user_id = $1 ORDER BY created_at DESC',
+      [req.userId]
     );
-    const subtasksResult = await pool.query('SELECT * FROM subtasks');
+    const subtasksResult = await pool.query(
+      'SELECT subtasks.* FROM subtasks JOIN tasks ON subtasks.task_id = tasks.id WHERE tasks.user_id = $1',
+      [req.userId]
+    );
 
     const subtasksByTaskId = new Map<number, typeof subtasksResult.rows>();
     for (const subtask of subtasksResult.rows) {
@@ -69,23 +117,171 @@ app.get('/tasks', async (req, res) => {
   }
 });
 
-app.post('/tasks', async (req, res) => {
+app.post('/auth/signup', authLimiter, async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  if (!password || typeof password !== 'string' || password.length < 8) {
+    return res
+      .status(400)
+      .json({ error: 'Password must be at least 8 characters' });
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  try {
+    const result = await pool.query(
+      'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email',
+      [email.toLowerCase().trim(), passwordHash]
+    );
+
+    const user = result.rows[0];
+    const { accessToken, refreshToken } = await issueTokens(pool, user.id);
+
+    res.status(201).json({
+      accessToken,
+      refreshToken,
+      user: { id: user.id, email: user.email },
+    });
+  } catch (err) {
+    if ((err as { code?: string }).code === '23505') {
+      return res.status(409).json({ error: 'Email already in use' });
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Failed to create account' });
+  }
+});
+
+app.post('/auth/login', authLimiter, async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT id, email, password_hash FROM users WHERE email = $1',
+      [email.toLowerCase().trim()]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const user = result.rows[0];
+    const passwordMatches = await bcrypt.compare(password, user.password_hash);
+
+    if (!passwordMatches) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const { accessToken, refreshToken } = await issueTokens(pool, user.id);
+
+    res.status(200).json({
+      accessToken,
+      refreshToken,
+      user: { id: user.id, email: user.email },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to log in' });
+  }
+});
+
+app.post('/auth/logout', apiLimiter, async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken || typeof refreshToken !== 'string') {
+    return res.status(400).json({ error: 'Refresh token is required' });
+  }
+
+  const tokenHash = hashToken(refreshToken);
+
+  try {
+    await pool.query(
+      'UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = $1 AND revoked_at is NULL',
+      [tokenHash]
+    );
+    res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to log out' });
+  }
+});
+
+app.post('/auth/refresh', refreshLimiter, async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken || typeof refreshToken !== 'string') {
+    return res.status(400).json({ error: 'Refresh token is required' });
+  }
+
+  const tokenHash = hashToken(refreshToken);
+  let client: PoolClient | undefined;
+
+  try {
+    client = await pool.connect();
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `UPDATE refresh_tokens
+   SET revoked_at = NOW()
+   WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > NOW()
+   RETURNING user_id`,
+      [tokenHash]
+    );
+
+    if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
+
+      const reuseCheck = await client.query(
+        `SELECT user_id FROM refresh_tokens WHERE token_hash = $1 AND revoked_at IS NOT NULL AND revoked_at < NOW() - interval '10 seconds'`,
+        [tokenHash]
+      );
+
+      if (reuseCheck.rows.length > 0) {
+        await client.query(
+          'UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL',
+          [reuseCheck.rows[0].user_id]
+        );
+      }
+
+      return res.status(401).json({ error: 'Invalid refresh token' });
+    }
+
+    const { accessToken, refreshToken: newRefreshToken } = await issueTokens(
+      client,
+      result.rows[0].user_id
+    );
+    await client.query('COMMIT');
+    res.status(200).json({ accessToken, refreshToken: newRefreshToken });
+  } catch (err) {
+    if (client) await client.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ error: 'Failed to refresh token' });
+  } finally {
+    client?.release();
+  }
+});
+
+app.post('/tasks', apiLimiter, authenticate, async (req, res) => {
   const { title } = req.body;
 
   if (!title) {
     return res.status(400).json({ error: 'Title is required' });
   }
-
   if (typeof title !== 'string') {
     return res.status(400).json({ error: 'Title must be a string' });
   }
 
   const trimmedTitle = title.trim();
-
   if (trimmedTitle.length === 0) {
     return res.status(400).json({ error: 'Title cannot be empty' });
   }
-
   if (trimmedTitle.length > 100) {
     return res
       .status(400)
@@ -94,8 +290,8 @@ app.post('/tasks', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'INSERT INTO tasks (title) VALUES ($1) RETURNING *',
-      [trimmedTitle]
+      'INSERT INTO tasks (title, user_id) VALUES ($1, $2) RETURNING *',
+      [trimmedTitle, req.userId]
     );
     res.status(201).json({ ...result.rows[0], subtasks: [] });
   } catch (err) {
@@ -104,255 +300,284 @@ app.post('/tasks', async (req, res) => {
   }
 });
 
-app.post('/tasks/:id/subtasks', async (req, res) => {
-  const { id } = req.params;
-  const { title, dx, dy } = req.body;
+app.post(
+  '/tasks/:id/subtasks',
+  apiLimiter,
+  authenticate,
+  async (req: Request<{ id: string }>, res: Response) => {
+    const { id } = req.params;
+    const { title, dx, dy } = req.body;
 
-  if (!/^[1-9]\d*$/.test(id)) {
-    return res.status(400).json({ error: 'Invalid task ID' });
-  }
-
-  if (!title || typeof title !== 'string' || title.length > 100) {
-    return res
-      .status(400)
-      .json({ error: 'Title is required and must be under 100 characters' });
-  }
-
-  if (dx !== undefined && (typeof dx !== 'number' || Number.isNaN(dx))) {
-    return res.status(400).json({ error: 'dx must be a number' });
-  }
-
-  if (dy !== undefined && (typeof dy !== 'number' || Number.isNaN(dy))) {
-    return res.status(400).json({ error: 'dy must be a number' });
-  }
-
-  try {
-    const taskCheck = await pool.query('SELECT id FROM tasks WHERE id = $1', [
-      id,
-    ]);
-    if (taskCheck.rows.length === 0) {
-      return res.status(404).json({ error: 'Task not found' });
+    if (!/^[1-9]\d*$/.test(id)) {
+      return res.status(400).json({ error: 'Invalid task ID' });
     }
 
-    // dx/dy are optional — omitting them falls back to the schema's default
-    // offset (used when the client has no better placement in mind).
-    const result =
-      dx !== undefined && dy !== undefined
-        ? await pool.query(
-            'INSERT INTO subtasks (task_id, title, dx, dy) VALUES ($1, $2, $3, $4) RETURNING *',
-            [id, title, dx, dy]
-          )
-        : await pool.query(
-            'INSERT INTO subtasks (task_id, title) VALUES ($1, $2) RETURNING *',
-            [id, title]
-          );
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to create subtask' });
-  }
-});
-
-app.patch('/tasks/:id', async (req, res) => {
-  const { id } = req.params;
-
-  if (!/^[1-9]\d*$/.test(id)) {
-    return res.status(400).json({ error: 'Invalid task ID' });
-  }
-
-  const fields: string[] = [];
-  const values: unknown[] = [];
-  let paramIndex = 1;
-
-  if (req.body.completed !== undefined) {
-    if (typeof req.body.completed !== 'boolean') {
-      return res.status(400).json({ error: 'completed must be a boolean' });
-    }
-    fields.push(`completed = $${paramIndex++}`);
-    values.push(req.body.completed);
-  }
-
-  if (req.body.title !== undefined) {
-    if (typeof req.body.title !== 'string') {
-      return res.status(400).json({ error: 'title must be a string' });
-    }
-    const trimmedTitle = req.body.title.trim();
-
-    if (trimmedTitle.length === 0) {
-      return res.status(400).json({ error: 'Title cannot be empty' });
-    }
-
-    if (trimmedTitle.length > 100) {
+    if (!title || typeof title !== 'string' || title.length > 100) {
       return res
         .status(400)
-        .json({ error: 'Title must be 100 characters or less' });
+        .json({ error: 'Title is required and must be under 100 characters' });
     }
 
-    fields.push(`title = $${paramIndex++}`);
-    values.push(trimmedTitle);
-  }
-
-  if (req.body.notes !== undefined) {
-    if (typeof req.body.notes !== 'string') {
-      return res.status(400).json({ error: 'notes must be a string' });
-    }
-    fields.push(`notes = $${paramIndex++}`);
-    values.push(req.body.notes);
-  }
-
-  if (req.body.x !== undefined) {
-    if (typeof req.body.x !== 'number' || Number.isNaN(req.body.x)) {
-      return res.status(400).json({ error: 'x must be a number' });
-    }
-    fields.push(`x = $${paramIndex++}`);
-    values.push(req.body.x);
-  }
-
-  if (req.body.y !== undefined) {
-    if (typeof req.body.y !== 'number' || Number.isNaN(req.body.y)) {
-      return res.status(400).json({ error: 'y must be a number' });
-    }
-    fields.push(`y = $${paramIndex++}`);
-    values.push(req.body.y);
-  }
-
-  if (fields.length === 0) {
-    return res.status(400).json({ error: 'No valid fields provided' });
-  }
-
-  values.push(id);
-
-  try {
-    const result = await pool.query(
-      `UPDATE tasks SET ${fields.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
-      values
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Task not found' });
-    }
-
-    res.status(200).json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to update task' });
-  }
-});
-
-app.patch('/subtasks/:id', async (req, res) => {
-  const { id } = req.params;
-
-  if (!/^[1-9]\d*$/.test(id)) {
-    return res.status(400).json({ error: 'Invalid subtask ID' });
-  }
-
-  const fields: string[] = [];
-  const values: unknown[] = [];
-  let paramIndex = 1;
-
-  if (req.body.completed !== undefined) {
-    if (typeof req.body.completed !== 'boolean') {
-      return res.status(400).json({ error: 'completed must be a boolean' });
-    }
-    fields.push(`completed = $${paramIndex++}`);
-    values.push(req.body.completed);
-  }
-
-  if (req.body.title !== undefined) {
-    if (typeof req.body.title !== 'string') {
-      return res.status(400).json({ error: 'title must be a string' });
-    }
-    const trimmedTitle = req.body.title.trim();
-    if (trimmedTitle.length === 0) {
-      return res.status(400).json({ error: 'Title cannot be empty' });
-    }
-    if (trimmedTitle.length > 100) {
-      return res
-        .status(400)
-        .json({ error: 'Title must be 100 characters or less' });
-    }
-    fields.push(`title = $${paramIndex++}`);
-    values.push(trimmedTitle);
-  }
-
-  if (req.body.dx !== undefined) {
-    if (typeof req.body.dx !== 'number' || Number.isNaN(req.body.dx)) {
+    if (dx !== undefined && (typeof dx !== 'number' || Number.isNaN(dx))) {
       return res.status(400).json({ error: 'dx must be a number' });
     }
-    fields.push(`dx = $${paramIndex++}`);
-    values.push(req.body.dx);
-  }
 
-  if (req.body.dy !== undefined) {
-    if (typeof req.body.dy !== 'number' || Number.isNaN(req.body.dy)) {
+    if (dy !== undefined && (typeof dy !== 'number' || Number.isNaN(dy))) {
       return res.status(400).json({ error: 'dy must be a number' });
     }
-    fields.push(`dy = $${paramIndex++}`);
-    values.push(req.body.dy);
+
+    try {
+      const taskCheck = await pool.query(
+        'SELECT id FROM tasks WHERE id = $1 AND user_id = $2',
+        [id, req.userId]
+      );
+      if (taskCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+      const result =
+        dx !== undefined && dy !== undefined
+          ? await pool.query(
+              'INSERT INTO subtasks (task_id, title, dx, dy) VALUES ($1, $2, $3, $4) RETURNING *',
+              [id, title, dx, dy]
+            )
+          : await pool.query(
+              'INSERT INTO subtasks (task_id, title) VALUES ($1, $2) RETURNING *',
+              [id, title]
+            );
+      res.status(201).json(result.rows[0]);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to create subtask' });
+    }
   }
+);
 
-  if (fields.length === 0) {
-    return res.status(400).json({ error: 'No valid fields provided' });
-  }
+app.patch(
+  '/tasks/:id',
+  apiLimiter,
+  authenticate,
+  async (req: Request<{ id: string }>, res: Response) => {
+    const { id } = req.params;
 
-  values.push(id);
-
-  try {
-    const result = await pool.query(
-      `UPDATE subtasks SET ${fields.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
-      values
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Subtask not found' });
+    if (!/^[1-9]\d*$/.test(id)) {
+      return res.status(400).json({ error: 'Invalid task ID' });
     }
 
-    res.status(200).json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to update subtask' });
-  }
-});
+    const fields: string[] = [];
+    const values: unknown[] = [];
+    let paramIndex = 1;
 
-app.delete('/tasks/:id', async (req, res) => {
-  const { id } = req.params;
-
-  if (!/^[1-9]\d*$/.test(id)) {
-    return res.status(400).json({ error: 'Invalid task ID' });
-  }
-
-  try {
-    const result = await pool.query('DELETE FROM tasks WHERE id = $1', [id]);
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Task not found' });
+    if (req.body.completed !== undefined) {
+      if (typeof req.body.completed !== 'boolean') {
+        return res.status(400).json({ error: 'completed must be a boolean' });
+      }
+      fields.push(`completed = $${paramIndex++}`);
+      values.push(req.body.completed);
     }
 
-    res.status(204).send();
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to delete task' });
-  }
-});
+    if (req.body.title !== undefined) {
+      if (typeof req.body.title !== 'string') {
+        return res.status(400).json({ error: 'title must be a string' });
+      }
+      const trimmedTitle = req.body.title.trim();
 
-app.delete('/subtasks/:id', async (req, res) => {
-  const { id } = req.params;
-  if (!/^[1-9]\d*$/.test(id)) {
-    return res.status(400).json({ error: 'Invalid subtask ID' });
-  }
+      if (trimmedTitle.length === 0) {
+        return res.status(400).json({ error: 'Title cannot be empty' });
+      }
 
-  try {
-    const result = await pool.query('DELETE FROM subtasks WHERE id = $1', [id]);
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Subtask not found' });
+      if (trimmedTitle.length > 100) {
+        return res
+          .status(400)
+          .json({ error: 'Title must be 100 characters or less' });
+      }
+
+      fields.push(`title = $${paramIndex++}`);
+      values.push(trimmedTitle);
     }
 
-    res.status(204).send();
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to delete subtask' });
+    if (req.body.notes !== undefined) {
+      if (typeof req.body.notes !== 'string') {
+        return res.status(400).json({ error: 'notes must be a string' });
+      }
+      fields.push(`notes = $${paramIndex++}`);
+      values.push(req.body.notes);
+    }
+
+    if (req.body.x !== undefined) {
+      if (typeof req.body.x !== 'number' || Number.isNaN(req.body.x)) {
+        return res.status(400).json({ error: 'x must be a number' });
+      }
+      fields.push(`x = $${paramIndex++}`);
+      values.push(req.body.x);
+    }
+
+    if (req.body.y !== undefined) {
+      if (typeof req.body.y !== 'number' || Number.isNaN(req.body.y)) {
+        return res.status(400).json({ error: 'y must be a number' });
+      }
+      fields.push(`y = $${paramIndex++}`);
+      values.push(req.body.y);
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ error: 'No valid fields provided' });
+    }
+
+    values.push(id, req.userId);
+
+    try {
+      const result = await pool.query(
+        `UPDATE tasks SET ${fields.join(', ')} WHERE id = $${paramIndex} AND user_id = $${paramIndex + 1} RETURNING *`,
+        values
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      res.status(200).json(result.rows[0]);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to update task' });
+    }
   }
-});
+);
+
+app.patch(
+  '/subtasks/:id',
+  apiLimiter,
+  authenticate,
+  async (req: Request<{ id: string }>, res: Response) => {
+    const { id } = req.params;
+
+    if (!/^[1-9]\d*$/.test(id)) {
+      return res.status(400).json({ error: 'Invalid subtask ID' });
+    }
+
+    const fields: string[] = [];
+    const values: unknown[] = [];
+    let paramIndex = 1;
+
+    if (req.body.completed !== undefined) {
+      if (typeof req.body.completed !== 'boolean') {
+        return res.status(400).json({ error: 'completed must be a boolean' });
+      }
+      fields.push(`completed = $${paramIndex++}`);
+      values.push(req.body.completed);
+    }
+
+    if (req.body.title !== undefined) {
+      if (typeof req.body.title !== 'string') {
+        return res.status(400).json({ error: 'title must be a string' });
+      }
+      const trimmedTitle = req.body.title.trim();
+      if (trimmedTitle.length === 0) {
+        return res.status(400).json({ error: 'Title cannot be empty' });
+      }
+      if (trimmedTitle.length > 100) {
+        return res
+          .status(400)
+          .json({ error: 'Title must be 100 characters or less' });
+      }
+      fields.push(`title = $${paramIndex++}`);
+      values.push(trimmedTitle);
+    }
+
+    if (req.body.dx !== undefined) {
+      if (typeof req.body.dx !== 'number' || Number.isNaN(req.body.dx)) {
+        return res.status(400).json({ error: 'dx must be a number' });
+      }
+      fields.push(`dx = $${paramIndex++}`);
+      values.push(req.body.dx);
+    }
+
+    if (req.body.dy !== undefined) {
+      if (typeof req.body.dy !== 'number' || Number.isNaN(req.body.dy)) {
+        return res.status(400).json({ error: 'dy must be a number' });
+      }
+      fields.push(`dy = $${paramIndex++}`);
+      values.push(req.body.dy);
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ error: 'No valid fields provided' });
+    }
+
+    values.push(id, req.userId);
+
+    try {
+      const result = await pool.query(
+        `UPDATE subtasks SET ${fields.join(', ')} FROM tasks WHERE subtasks.id = $${paramIndex} AND subtasks.task_id = tasks.id AND tasks.user_id = $${paramIndex + 1} RETURNING subtasks.*`,
+        values
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Subtask not found' });
+      }
+
+      res.status(200).json(result.rows[0]);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to update subtask' });
+    }
+  }
+);
+
+app.delete(
+  '/tasks/:id',
+  apiLimiter,
+  authenticate,
+  async (req: Request<{ id: string }>, res: Response) => {
+    const { id } = req.params;
+
+    if (!/^[1-9]\d*$/.test(id)) {
+      return res.status(400).json({ error: 'Invalid task ID' });
+    }
+
+    try {
+      const result = await pool.query(
+        'DELETE FROM tasks WHERE id = $1 AND user_id = $2',
+        [id, req.userId]
+      );
+
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      res.status(204).send();
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to delete task' });
+    }
+  }
+);
+
+app.delete(
+  '/subtasks/:id',
+  apiLimiter,
+  authenticate,
+  async (req: Request<{ id: string }>, res: Response) => {
+    const { id } = req.params;
+    if (!/^[1-9]\d*$/.test(id)) {
+      return res.status(400).json({ error: 'Invalid subtask ID' });
+    }
+
+    try {
+      const result = await pool.query(
+        'DELETE FROM subtasks USING tasks WHERE subtasks.id = $1 AND subtasks.task_id = tasks.id AND tasks.user_id = $2',
+        [id, req.userId]
+      );
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: 'Subtask not found' });
+      }
+
+      res.status(204).send();
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to delete subtask' });
+    }
+  }
+);
 
 app.use(
   (

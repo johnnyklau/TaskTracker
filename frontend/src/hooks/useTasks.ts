@@ -17,13 +17,16 @@ import {
   type Subtask,
   type Task,
 } from '../api/tasks';
+import { useAuth } from '../context/useAuth';
 
 const tasksKey = ['tasks'] as const; // TODO: Query key factory??
 
 export function useTasks() {
+  const { user } = useAuth();
   return useQuery({
     queryKey: tasksKey,
     queryFn: fetchTasks,
+    enabled: !!user,
   });
 }
 
