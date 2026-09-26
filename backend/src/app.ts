@@ -48,14 +48,15 @@ const authLimiter = rateLimit({
   message: { error: 'Too many attempts, please try again later' },
 });
 
+// Separate from authLimiter so failed logins can't block token refresh.
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  skip: skipInTest,
+  message: { error: 'Too many attempts, please try again later' },
+});
+
 app.set('trust proxy', 1);
-
-app.use('/auth/signup', authLimiter);
-app.use('/auth/login', authLimiter);
-app.use('/auth/refresh', authLimiter);
-
-app.use('/tasks', apiLimiter);
-app.use('/subtasks', apiLimiter);
 
 function generateRefreshToken(): string {
   return crypto.randomBytes(32).toString('hex');
@@ -86,7 +87,7 @@ app.get('/health', async (req, res) => {
 });
 
 // TODO: No pagination , currently just a full bulk get.
-app.get('/tasks', authenticate, async (req, res) => {
+app.get('/tasks', apiLimiter, authenticate, async (req, res) => {
   try {
     const tasksResult = await pool.query(
       'SELECT * FROM tasks WHERE user_id = $1 ORDER BY created_at DESC',
@@ -116,7 +117,7 @@ app.get('/tasks', authenticate, async (req, res) => {
   }
 });
 
-app.post('/auth/signup', async (req, res) => {
+app.post('/auth/signup', authLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || typeof email !== 'string') {
@@ -154,7 +155,7 @@ app.post('/auth/signup', async (req, res) => {
   }
 });
 
-app.post('/auth/login', async (req, res) => {
+app.post('/auth/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -191,7 +192,7 @@ app.post('/auth/login', async (req, res) => {
   }
 });
 
-app.post('/auth/logout', async (req, res) => {
+app.post('/auth/logout', apiLimiter, async (req, res) => {
   const { refreshToken } = req.body;
 
   if (!refreshToken || typeof refreshToken !== 'string') {
@@ -212,7 +213,7 @@ app.post('/auth/logout', async (req, res) => {
   }
 });
 
-app.post('/auth/refresh', async (req, res) => {
+app.post('/auth/refresh', refreshLimiter, async (req, res) => {
   const { refreshToken } = req.body;
 
   if (!refreshToken || typeof refreshToken !== 'string') {
@@ -267,7 +268,7 @@ app.post('/auth/refresh', async (req, res) => {
   }
 });
 
-app.post('/tasks', authenticate, async (req, res) => {
+app.post('/tasks', apiLimiter, authenticate, async (req, res) => {
   const { title } = req.body;
 
   if (!title) {
@@ -301,6 +302,7 @@ app.post('/tasks', authenticate, async (req, res) => {
 
 app.post(
   '/tasks/:id/subtasks',
+  apiLimiter,
   authenticate,
   async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
@@ -352,6 +354,7 @@ app.post(
 
 app.patch(
   '/tasks/:id',
+  apiLimiter,
   authenticate,
   async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
@@ -442,6 +445,7 @@ app.patch(
 
 app.patch(
   '/subtasks/:id',
+  apiLimiter,
   authenticate,
   async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
@@ -521,6 +525,7 @@ app.patch(
 
 app.delete(
   '/tasks/:id',
+  apiLimiter,
   authenticate,
   async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
@@ -549,6 +554,7 @@ app.delete(
 
 app.delete(
   '/subtasks/:id',
+  apiLimiter,
   authenticate,
   async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;

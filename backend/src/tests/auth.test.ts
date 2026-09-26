@@ -402,3 +402,26 @@ describe('authenticate middleware', () => {
     expect(response.status).toBe(401);
   });
 });
+
+// Keep last: the limiter's in-memory counter persists for the rest of this
+// file. Every other test runs with NODE_ENV=test, which skips the limiter, so
+// nothing earlier has touched the counter.
+describe('rate limiting', () => {
+  it('returns 429 after 10 login attempts from the same IP', async () => {
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const statuses: number[] = [];
+      for (let i = 0; i < 11; i++) {
+        const response = await request(app)
+          .post('/auth/login')
+          .send({ email: 'missing@example.com', password: 'wrongpassword' });
+        statuses.push(response.status);
+      }
+      expect(statuses.slice(0, 10).every((s) => s === 401)).toBe(true);
+      expect(statuses[10]).toBe(429);
+    } finally {
+      process.env.NODE_ENV = originalEnv;
+    }
+  });
+});
