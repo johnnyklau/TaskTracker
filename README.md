@@ -11,11 +11,13 @@ This is a basic to-do style app, but my aim was to ensure it was as complete as 
 
 ## Tech Stack
 
-**Front-end:** React + TypeScript built with Vite, deployed on Vercel.
+**Front-end:** React + TypeScript built with Vite, styled with Tailwind, deployed on Vercel.
 
 **Back-end:** Node + Express, containerized with Docker, deployed to Render.
 
 **Database:** PostgreSQL, hosted on Neon.
+
+**Authentication:** JWT-based Auth built directly on Express.
 
 **Testing:**
 
@@ -30,8 +32,11 @@ This is a basic to-do style app, but my aim was to ensure it was as complete as 
   image to Render, each via their respective CLI/API rather than native
   git-triggered auto-deploy, keeping the deploy step explicit and visible
 
-**Also configured:** branch protection (CI must pass to merge), Dependabot
-(dependency + GitHub Actions updates), and CodeQL (automated security scanning).
+**Also configured:** 
+- JWT access/refresh token pair with rotation and revocation
+- branch protection (CI must pass to merge)
+- Dependabot (dependency + GitHub Actions updates)
+- CodeQL (automated security scanning).
 
 ## Running Locally
 
