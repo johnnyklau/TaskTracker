@@ -30,12 +30,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
-    if (refreshToken) {
+    const { refreshToken: currentRefreshToken } = loadStoredAuth();
+
+    if (currentRefreshToken) {
       try {
         await fetch(`${API_URL}/auth/logout`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken }),
+          body: JSON.stringify({ refreshToken: currentRefreshToken }),
         });
       } catch {
         // Best-effort
