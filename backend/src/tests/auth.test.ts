@@ -103,11 +103,6 @@ describe('POST /auth/refresh', () => {
     );
     expect(check.rows[0].revoked_at).not.toBeNull();
   });
-
-  it('rejects a missing refresh token', async () => {
-    const response = await request(app).post('/auth/logout').send({});
-    expect(response.status).toBe(400);
-  });
   it('rejects an expired refresh token', async () => {
     const { user } = await createTestUser();
     const expiredToken = await insertRefreshToken(user.id, {
@@ -142,7 +137,7 @@ describe('POST /auth/refresh', () => {
     expect(response.status).toBe(400);
   });
 
-  it('does not let two concurrent requests to succeed with the same token', async () => {
+  it('does not let two concurrent requests succeed with the same token', async () => {
     const { refreshToken } = await createTestUser();
 
     const [first, second] = await Promise.all([
@@ -223,6 +218,10 @@ describe('POST /auth/refresh', () => {
 });
 
 describe('POST /auth/logout', () => {
+  it('rejects a missing refresh token', async () => {
+    const response = await request(app).post('/auth/logout').send({});
+    expect(response.status).toBe(400);
+  });
   it('revokes the refresh token', async () => {
     const { refreshToken } = await createTestUser();
 
@@ -238,7 +237,7 @@ describe('POST /auth/logout', () => {
     );
     expect(check.rows[0].revoked_at).not.toBeNull();
   });
-  it('succeeds even wtih an already-invalid token', async () => {
+  it('succeeds even with an already-invalid token', async () => {
     const response = await request(app)
       .post('/auth/logout')
       .send({ refreshToken: 'garbage-token' });

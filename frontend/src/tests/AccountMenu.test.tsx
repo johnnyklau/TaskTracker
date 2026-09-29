@@ -10,8 +10,6 @@ describe('AccountMenu', () => {
   it('renders nothing when logged out', () => {
     vi.mocked(AuthContext.useAuth).mockReturnValue({
       user: null,
-      accessToken: null,
-      refreshToken: null,
       login: vi.fn(),
       signup: vi.fn(),
       logout: vi.fn(),
@@ -24,8 +22,6 @@ describe('AccountMenu', () => {
     const user = userEvent.setup();
     vi.mocked(AuthContext.useAuth).mockReturnValue({
       user: { id: 1, email: 'HSY@example.com' },
-      accessToken: 'x',
-      refreshToken: 'x',
       login: vi.fn(),
       signup: vi.fn(),
       logout: vi.fn(),
@@ -39,8 +35,6 @@ describe('AccountMenu', () => {
     const logout = vi.fn();
     vi.mocked(AuthContext.useAuth).mockReturnValue({
       user: { id: 1, email: 'HSY@example.com' },
-      accessToken: 'x',
-      refreshToken: 'x',
       login: vi.fn(),
       signup: vi.fn(),
       logout,
@@ -54,8 +48,6 @@ describe('AccountMenu', () => {
     const user = userEvent.setup();
     vi.mocked(AuthContext.useAuth).mockReturnValue({
       user: { id: 1, email: 'HSY@example.com' },
-      accessToken: 'x',
-      refreshToken: 'x',
       login: vi.fn(),
       signup: vi.fn(),
       logout: vi.fn(),

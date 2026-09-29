@@ -7,3 +7,5 @@ export const MAX_ZOOM = 1.6;
 /** Matches the DB schema's subtask dx/dy defaults, so a new subtask doesn't jump position once created. */
 export const DEFAULT_SUBTASK_DX = 180;
 export const DEFAULT_SUBTASK_DY = -140;
+
+export const GOLDEN_ANGLE_DEG = 137.508;
