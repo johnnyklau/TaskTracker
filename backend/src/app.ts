@@ -37,7 +37,7 @@ const skipInTest = () => process.env.NODE_ENV === 'test';
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 750,
   skip: skipInTest,
 });
 
@@ -83,6 +83,7 @@ async function issueTokens(db: Pool | PoolClient, userId: number) {
 }
 
 app.get('/health', async (req, res) => {
+  console.log('req.ip:', req.ip);
   res.status(200).json({ status: 'ok' });
 });
 
@@ -222,6 +223,7 @@ app.post('/auth/refresh', refreshLimiter, async (req, res) => {
 
   const tokenHash = hashToken(refreshToken);
   let client: PoolClient | undefined;
+  let discardClient = false;
 
   try {
     client = await pool.connect();
@@ -260,11 +262,14 @@ app.post('/auth/refresh', refreshLimiter, async (req, res) => {
     await client.query('COMMIT');
     res.status(200).json({ accessToken, refreshToken: newRefreshToken });
   } catch (err) {
-    if (client) await client.query('ROLLBACK');
+    if (client)
+      await client.query('ROLLBACK').catch(() => {
+        discardClient = true;
+      });
     console.error(err);
     res.status(500).json({ error: 'Failed to refresh token' });
   } finally {
-    client?.release();
+    client?.release(discardClient);
   }
 });
 
