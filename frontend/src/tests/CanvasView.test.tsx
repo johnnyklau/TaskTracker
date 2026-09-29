@@ -1,5 +1,5 @@
 import { MAIN_CLOUD_WIDTH } from '../components/canvasConstants';
-import { findTaskPlacement } from '../components/CanvasView';
+import { findTaskPlacement } from '../components/CanvasHelpers';
 
 describe('findTaskPlacement', () => {
   it('returns a position when there are no existing tasks', () => {
