@@ -6,6 +6,35 @@ export type StoredAuth = {
   refreshToken: string | null;
 };
 
+export type RefreshResponse = {
+  accessToken: string;
+  refreshToken: string;
+};
+
+export function isRefreshResponse(value: unknown): value is RefreshResponse {
+  if (typeof value !== 'object' || value === null) return false;
+  const r = value as Record<string, unknown>;
+  return (
+    typeof r.accessToken === 'string' && typeof r.refreshToken === 'string'
+  );
+}
+
+export type AuthResponse = {
+  accessToken: string;
+  refreshToken: string;
+  user: { id: number; email: string };
+};
+
+export function isAuthResponse(value: unknown): value is AuthResponse {
+  if (typeof value !== 'object' || value === null) return false;
+  const r = value as Record<string, unknown>;
+  if (typeof r.accessToken !== 'string' || typeof r.refreshToken !== 'string')
+    return false;
+  if (typeof r.user !== 'object' || r.user === null) return false;
+  const u = r.user as Record<string, unknown>;
+  return typeof u.id === 'number' && typeof u.email === 'string';
+}
+
 export function loadStoredAuth(): StoredAuth {
   const raw = localStorage.getItem(AUTH_STORAGE_KEY);
   if (!raw) return { user: null, accessToken: null, refreshToken: null };

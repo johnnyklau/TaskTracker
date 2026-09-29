@@ -11,6 +11,11 @@ import { authenticate } from './middleware/authenticate';
 import crypto from 'crypto';
 import { Pool, PoolClient } from 'pg';
 
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable not set.');
+  process.exit(1);
+}
+
 const app = express();
 app.disable('x-powered-by');
 app.use(helmet());
@@ -131,6 +136,12 @@ app.post('/auth/signup', authLimiter, async (req, res) => {
       .json({ error: 'Password must be at least 8 characters' });
   }
 
+  if (Buffer.byteLength(password, 'utf8') > 72) {
+    return res
+      .status(400)
+      .json({ error: 'Password must be 72 bytes or fewer' });
+  }
+
   const passwordHash = await bcrypt.hash(password, 10);
 
   try {
@@ -159,7 +170,12 @@ app.post('/auth/signup', authLimiter, async (req, res) => {
 app.post('/auth/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) {
+  if (
+    !email ||
+    typeof email !== 'string' ||
+    !password ||
+    typeof password !== 'string'
+  ) {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
