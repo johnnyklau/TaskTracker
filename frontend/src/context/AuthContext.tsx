@@ -10,8 +10,7 @@ import { API_URL } from '../api/tasks';
 import { AuthContext } from './useAuth';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [{ user, accessToken, refreshToken }, setAuth] =
-    useState(loadStoredAuth);
+  const [{ user }, setAuth] = useState(loadStoredAuth);
   const queryClient = useQueryClient();
 
   function persistAuth(user: User, accessToken: string, refreshToken: string) {
@@ -49,9 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider
-      value={{ user, accessToken, refreshToken, login, signup, logout }}
-    >
+    <AuthContext.Provider value={{ user, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );
