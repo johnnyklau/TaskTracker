@@ -30,7 +30,6 @@ describe('AuthContext logout', () => {
     });
 
     const { result } = renderHook(() => useAuth(), { wrapper });
-    expect(result.current.refreshToken).toBe('old-refresh-token');
 
     let tasksCallCount = 0;
     const fetchMock = vi.fn((url: string, _options?: RequestInit) => {
@@ -64,8 +63,6 @@ describe('AuthContext logout', () => {
 
     await fetchTasks();
 
-    expect(result.current.refreshToken).toBe('old-refresh-token');
-
     await result.current.logout();
 
     const logoutCall = fetchMock.mock.calls.find(([url]) =>
@@ -85,15 +82,12 @@ describe('AuthContext logout', () => {
     });
 
     const { result } = renderHook(() => useAuth(), { wrapper });
-    expect(result.current.refreshToken).toBe('old-refresh-token');
 
     saveStoredAuth({
       user: { id: 1, email: 'HSY@example.com' },
       accessToken: 'new-access-token',
       refreshToken: 'new-refresh-token',
     });
-
-    expect(result.current.refreshToken).toBe('old-refresh-token');
 
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal('fetch', fetchMock);

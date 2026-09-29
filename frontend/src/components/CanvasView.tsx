@@ -37,7 +37,7 @@ type Cam = { x: number; y: number };
 const GOLDEN_ANGLE_DEG = 137.508;
 
 /** Collision-avoiding spiral placement for a task that's never been positioned. */
-function findTaskPlacement(existing: { x: number; y: number }[]): {
+export function findTaskPlacement(existing: { x: number; y: number }[]): {
   x: number;
   y: number;
 } {
@@ -63,7 +63,7 @@ function findTaskPlacement(existing: { x: number; y: number }[]): {
  * collides with an existing subtask, spirals outward around it until it
  * finds a spot far enough away not to visually overlap.
  */
-function findSubtaskPlacement(existing: { dx: number; dy: number }[]): {
+export function findSubtaskPlacement(existing: { dx: number; dy: number }[]): {
   dx: number;
   dy: number;
 } {
@@ -207,17 +207,23 @@ export function CanvasView({ tasks }: CanvasViewProps) {
   // yet server-side. Once useAddTask's onSuccess swaps in the real task
   // (still x/y null), this effect picks it up and places it for real.
   useEffect(() => {
+    const alreadyPlaced: { x: number; y: number }[] = [];
+    tasks.forEach((task) => {
+      if (task.x === null || task.y === null) return;
+      alreadyPlaced.push({ x: task.x, y: task.y });
+      task.subtasks.forEach((s) => {
+        alreadyPlaced.push({ x: task.x! + s.dx, y: task.y! + s.dy });
+      });
+    });
+
     tasks.forEach((task) => {
       if (task.x !== null && task.y !== null) return;
       if (task.id < 0) return;
       if (placedRef.current.has(task.id)) return;
       placedRef.current.add(task.id);
 
-      const existingPositions = tasks
-        .filter((t) => t.id !== task.id && t.x !== null && t.y !== null)
-        .map((t) => ({ x: t.x!, y: t.y! }));
-
-      const { x, y } = findTaskPlacement(existingPositions);
+      const { x, y } = findTaskPlacement(alreadyPlaced);
+      alreadyPlaced.push({ x, y });
       moveTask(task.id, x, y);
     });
   }, [tasks, moveTask]);
