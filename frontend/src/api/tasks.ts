@@ -1,4 +1,8 @@
-import { loadStoredAuth, saveStoredAuth } from './authStorage';
+import {
+  isRefreshResponse,
+  loadStoredAuth,
+  saveStoredAuth,
+} from './authStorage';
 
 const envApiUrl = import.meta.env.VITE_API_URL;
 if (!envApiUrl && import.meta.env.PROD) {
@@ -107,8 +111,21 @@ async function refreshAccessToken(): Promise<string | null> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const current = loadStoredAuth();
+      if (
+        current.refreshToken &&
+        current.refreshToken !== refreshToken &&
+        current.accessToken
+      ) {
+        return current.accessToken;
+      }
+      return null;
+    }
+
     const data = await response.json();
+    if (!isRefreshResponse(data)) return null;
+
     saveStoredAuth({
       user,
       accessToken: data.accessToken,

@@ -10,7 +10,9 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
   const token = authHeader.slice(7);
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET!) as {
+    const payload = jwt.verify(token, process.env.JWT_SECRET!, {
+      algorithms: ['HS256'],
+    }) as {
       userId: number;
     };
     req.userId = payload.userId;
