@@ -52,6 +52,7 @@ jobs:
           node-version: 24
       - run: npm ci
       - run: npm run lint
+      - run: npm run typecheck
       - name: Load schema
         run: PGPASSWORD=postgres psql -h localhost -U postgres -d tasktracker -f src/db/schema.sql
       - run: npm run test

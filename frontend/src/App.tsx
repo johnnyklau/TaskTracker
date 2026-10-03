@@ -3,6 +3,7 @@ import { AuthForm } from './components/AuthForm';
 import { CanvasView } from './components/CanvasView';
 import { useAuth } from './context/useAuth';
 import { useTasks } from './hooks/useTasks';
+import { LoadingIndicator } from './components/LoadingIndicator';
 
 function App() {
   const { user, logout } = useAuth();
@@ -19,7 +20,7 @@ function App() {
   }
 
   if (isPending) {
-    return <div className="h-full min-h-140 w-full bg-canvas" />;
+    return <LoadingIndicator />;
   }
 
   if (isError) {
