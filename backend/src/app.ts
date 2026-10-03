@@ -97,7 +97,7 @@ async function issueTokens(db: Pool | PoolClient, userId: number) {
   return { accessToken, refreshToken };
 }
 
-app.get('/health', async (req, res) => {
+app.get('/health', apiLimiter, async (req, res) => {
   try {
     await pool.query('SELECT 1');
     res.status(200).json({ status: 'ok' });
