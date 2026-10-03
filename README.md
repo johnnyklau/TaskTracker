@@ -77,10 +77,28 @@ docker compose up
 
 Then separately start the frontend with `npm run dev`, same as above — the frontend was never containerized (see the architecture notes above).
 
-### First-time database setup
+### Database setup
 
-Load the schema once against a fresh Postgres:
+On first start with an empty volume, Postgres sets itself up automatically:
+
+- `tasktracker` (dev data) gets the schema from `backend/src/db/schema.sql`
+- `tasktracker_test` is created with the same schema, for the backend tests
+
+These init scripts only run when the `pgdata` volume is empty. If you already have a volume from before this setup, either load things manually:
 
 ```
 docker compose exec -T postgres psql -U postgres -d tasktracker < backend/src/db/schema.sql
+docker compose exec postgres psql -U postgres -c 'CREATE DATABASE tasktracker_test'
+docker compose exec -T postgres psql -U postgres -d tasktracker_test < backend/src/db/schema.sql
 ```
+
+or reset the volume with `docker compose down -v` (this deletes your local dev data).
+
+### Running tests
+
+```
+cd backend && npm test    # runs against tasktracker_test, never your dev data
+cd frontend && npm test
+```
+
+Set `TEST_DATABASE_URL` to point the backend tests at a different database.

@@ -17,6 +17,10 @@ import {
   type Task,
 } from '../api/tasks';
 import { useAuth } from '../context/useAuth';
+import {
+  DEFAULT_SUBTASK_DX,
+  DEFAULT_SUBTASK_DY,
+} from '../components/canvasConstants';
 
 const tasksKey = ['tasks'] as const; // TODO: Query key factory??
 
@@ -90,8 +94,8 @@ export function useAddSubtask() {
         task_id: taskId,
         title,
         completed: false,
-        dx: position?.dx ?? 180,
-        dy: position?.dy ?? -140,
+        dx: position?.dx ?? DEFAULT_SUBTASK_DX,
+        dy: position?.dy ?? DEFAULT_SUBTASK_DY,
         created_at: new Date().toISOString(),
       };
 

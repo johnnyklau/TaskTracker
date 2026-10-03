@@ -9,3 +9,4 @@ export const DEFAULT_SUBTASK_DX = 180;
 export const DEFAULT_SUBTASK_DY = -140;
 
 export const GOLDEN_ANGLE_DEG = 137.508;
+export const SLOW_LOAD_THRESHOLD_MS = 4000;

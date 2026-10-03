@@ -1,6 +1,44 @@
 import { vi } from 'vitest';
 import { fetchTasks } from '../api/tasks';
-import { saveStoredAuth } from '../api/authStorage';
+import { loadStoredAuth, saveStoredAuth } from '../api/authStorage';
+
+describe('refreshAccessToken failure handling', () => {
+  it('does not log out when refresh fails with a transient error, not a real 401', async () => {
+    saveStoredAuth({
+      user: { id: 1, email: 'test@example.com' },
+      accessToken: 'old-access-token',
+      refreshToken: 'old-refresh-token',
+    });
+
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes('/auth/refresh')) {
+        return Promise.resolve({
+          ok: false,
+          status: 503,
+          json: async () => ({ error: 'Service unavailable' }),
+        });
+      }
+      if (url.includes('/tasks')) {
+        return Promise.resolve({
+          ok: false,
+          status: 401,
+          json: async () => ({ error: 'Unauthorized' }),
+        });
+      }
+      return Promise.reject(new Error(`Unexpected fetch call to ${url}`));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const expiredListener = vi.fn();
+    window.addEventListener('auth:expired', expiredListener);
+
+    await expect(fetchTasks()).rejects.toThrow();
+    expect(expiredListener).not.toHaveBeenCalled();
+    expect(loadStoredAuth().refreshToken).toBe('old-refresh-token');
+
+    window.removeEventListener('auth:expired', expiredListener);
+  });
+});
 
 describe('authFetch multi-tab recovery', () => {
   it("uses a sibling tab's already-rotated token instead of dispatching auth:expired", async () => {

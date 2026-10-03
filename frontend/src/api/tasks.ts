@@ -99,11 +99,16 @@ function assertSubtask(value: unknown): Subtask {
   return value;
 }
 
-let refreshPromise: Promise<string | null> | null = null;
+type RefreshResult =
+  | { outcome: 'success'; accessToken: string }
+  | { outcome: 'expired' }
+  | { outcome: 'error' };
 
-async function refreshAccessToken(): Promise<string | null> {
+let refreshPromise: Promise<RefreshResult> | null = null;
+
+async function refreshAccessToken(): Promise<RefreshResult> {
   const { refreshToken, user } = loadStoredAuth();
-  if (!refreshToken || !user) return null;
+  if (!refreshToken || !user) return { outcome: 'expired' };
 
   try {
     const response = await fetch(`${API_URL}/auth/refresh`, {
@@ -111,29 +116,38 @@ async function refreshAccessToken(): Promise<string | null> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
     });
-    if (!response.ok) {
+
+    if (response.status === 401) {
+      // A sibling tab may have already rotated this exact token — check
+      // before concluding the session is genuinely over.
       const current = loadStoredAuth();
       if (
         current.refreshToken &&
         current.refreshToken !== refreshToken &&
         current.accessToken
       ) {
-        return current.accessToken;
+        return { outcome: 'success', accessToken: current.accessToken };
       }
-      return null;
+      return { outcome: 'expired' };
+    }
+
+    if (!response.ok) {
+      // 429 (rate limited), 5xx (cold start, transient server error) — the
+      // attempt failed, but nothing here proves the refresh token is bad.
+      return { outcome: 'error' };
     }
 
     const data = await response.json();
-    if (!isRefreshResponse(data)) return null;
+    if (!isRefreshResponse(data)) return { outcome: 'error' };
 
     saveStoredAuth({
       user,
       accessToken: data.accessToken,
       refreshToken: data.refreshToken,
     });
-    return data.accessToken;
+    return { outcome: 'success', accessToken: data.accessToken };
   } catch {
-    return null;
+    return { outcome: 'error' };
   }
 }
 
@@ -145,6 +159,7 @@ async function authFetch(
     ...options,
     headers: { ...options.headers, ...authHeaders() },
   });
+
   if (response.status !== 401) return response;
 
   if (!refreshPromise) {
@@ -152,10 +167,14 @@ async function authFetch(
       refreshPromise = null;
     });
   }
-  const newAccessToken = await refreshPromise;
+  const result = await refreshPromise;
 
-  if (!newAccessToken) {
+  if (result.outcome === 'expired') {
     window.dispatchEvent(new Event('auth:expired'));
+    return response;
+  }
+
+  if (result.outcome === 'error') {
     return response;
   }
 

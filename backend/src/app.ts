@@ -16,6 +16,12 @@ if (!process.env.JWT_SECRET) {
   process.exit(1);
 }
 
+const MAX_POSTGRES_INT = 2147483647;
+
+function isValidId(id: string): boolean {
+  return /^[1-9]\d*$/.test(id) && Number(id) <= MAX_POSTGRES_INT;
+}
+
 const app = express();
 app.disable('x-powered-by');
 app.use(helmet());
@@ -31,7 +37,11 @@ app.use(
       if (!origin || allowed.includes(origin)) {
         callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'));
+        const err = new Error('Not allowed by CORS') as Error & {
+          status?: number;
+        };
+        err.status = 403;
+        callback(err);
       }
     },
   })
@@ -87,9 +97,14 @@ async function issueTokens(db: Pool | PoolClient, userId: number) {
   return { accessToken, refreshToken };
 }
 
-app.get('/health', async (req, res) => {
-  console.log('req.ip:', req.ip);
-  res.status(200).json({ status: 'ok' });
+app.get('/health', apiLimiter, async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.status(200).json({ status: 'ok' });
+  } catch (err) {
+    console.error('Health check failed:', err);
+    res.status(503).json({ status: 'error' });
+  }
 });
 
 // TODO: No pagination , currently just a full bulk get.
@@ -329,21 +344,36 @@ app.post(
     const { id } = req.params;
     const { title, dx, dy } = req.body;
 
-    if (!/^[1-9]\d*$/.test(id)) {
+    if (!isValidId(id)) {
       return res.status(400).json({ error: 'Invalid task ID' });
     }
 
-    if (!title || typeof title !== 'string' || title.length > 100) {
-      return res
-        .status(400)
-        .json({ error: 'Title is required and must be under 100 characters' });
+    if (!title || typeof title !== 'string') {
+      return res.status(400).json({
+        error: 'Title is required and must be 100 characters or less',
+      });
+    }
+    const trimmedTitle = title.trim();
+    if (trimmedTitle.length > 100 || trimmedTitle.length === 0) {
+      return res.status(400).json({
+        error: 'Title is required and must be 100 characters or less',
+      });
     }
 
-    if (dx !== undefined && (typeof dx !== 'number' || Number.isNaN(dx))) {
+    const hasDx = dx !== undefined;
+    const hasDy = dy !== undefined;
+
+    if (hasDx !== hasDy) {
+      return res
+        .status(400)
+        .json({ error: 'dx and dy must be provided together' });
+    }
+
+    if (hasDx && (typeof dx !== 'number' || Number.isNaN(dx))) {
       return res.status(400).json({ error: 'dx must be a number' });
     }
 
-    if (dy !== undefined && (typeof dy !== 'number' || Number.isNaN(dy))) {
+    if (hasDy && (typeof dy !== 'number' || Number.isNaN(dy))) {
       return res.status(400).json({ error: 'dy must be a number' });
     }
 
@@ -355,16 +385,15 @@ app.post(
       if (taskCheck.rows.length === 0) {
         return res.status(404).json({ error: 'Task not found' });
       }
-      const result =
-        dx !== undefined && dy !== undefined
-          ? await pool.query(
-              'INSERT INTO subtasks (task_id, title, dx, dy) VALUES ($1, $2, $3, $4) RETURNING *',
-              [id, title, dx, dy]
-            )
-          : await pool.query(
-              'INSERT INTO subtasks (task_id, title) VALUES ($1, $2) RETURNING *',
-              [id, title]
-            );
+      const result = hasDx
+        ? await pool.query(
+            'INSERT INTO subtasks (task_id, title, dx, dy) VALUES ($1, $2, $3, $4) RETURNING *',
+            [id, trimmedTitle, dx, dy]
+          )
+        : await pool.query(
+            'INSERT INTO subtasks (task_id, title) VALUES ($1, $2) RETURNING *',
+            [id, trimmedTitle]
+          );
       res.status(201).json(result.rows[0]);
     } catch (err) {
       console.error(err);
@@ -380,7 +409,7 @@ app.patch(
   async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
 
-    if (!/^[1-9]\d*$/.test(id)) {
+    if (!isValidId(id)) {
       return res.status(400).json({ error: 'Invalid task ID' });
     }
 
@@ -471,7 +500,7 @@ app.patch(
   async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
 
-    if (!/^[1-9]\d*$/.test(id)) {
+    if (!isValidId(id)) {
       return res.status(400).json({ error: 'Invalid subtask ID' });
     }
 
@@ -551,7 +580,7 @@ app.delete(
   async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
 
-    if (!/^[1-9]\d*$/.test(id)) {
+    if (!isValidId(id)) {
       return res.status(400).json({ error: 'Invalid task ID' });
     }
 
@@ -579,7 +608,8 @@ app.delete(
   authenticate,
   async (req: Request<{ id: string }>, res: Response) => {
     const { id } = req.params;
-    if (!/^[1-9]\d*$/.test(id)) {
+
+    if (!isValidId(id)) {
       return res.status(400).json({ error: 'Invalid subtask ID' });
     }
 
@@ -602,13 +632,17 @@ app.delete(
 
 app.use(
   (
-    err: Error,
+    err: Error & { status?: number; statusCode?: number },
     _req: express.Request,
     res: express.Response,
     _next: express.NextFunction
   ) => {
     console.error(err);
-    res.status(400).json({ error: 'Invalid request' });
+    const status = err.status ?? err.statusCode;
+    if (status && status >= 400 && status < 500) {
+      return res.status(status).json({ error: 'Invalid request' });
+    }
+    res.status(500).json({ error: 'Something went wrong' });
   }
 );
 

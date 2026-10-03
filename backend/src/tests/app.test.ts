@@ -3,9 +3,26 @@ import request from 'supertest';
 import app from '../app';
 import pool from '../db/pool';
 import { createTestUser } from './testHelpers';
+import { vi } from 'vitest';
+import bcrypt from 'bcryptjs';
 
 beforeEach(async () => {
   await pool.query('DELETE FROM users');
+});
+
+describe('/health check', () => {
+  it('returns 403, not 500, for a disallowed CORS origin', async () => {
+    const response = await request(app)
+      .get('/health')
+      .set('Origin', 'https://not-allowed.example.com');
+    expect(response.status).toBe(403);
+  });
+  it('rejects a request from an unrelated vercel.app subdomain', async () => {
+    const response = await request(app)
+      .get('/health')
+      .set('Origin', 'https://some-other-random-project.vercel.app');
+    expect(response.status).toBe(403);
+  });
 });
 
 describe('GET /tasks', () => {
@@ -16,6 +33,19 @@ describe('GET /tasks', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(response.status).toBe(200);
     expect(response.body).toEqual([]);
+  });
+  it('returns 500, not 400, when a route throws an unhandled error', async () => {
+    const spy = vi
+      .spyOn(bcrypt, 'hash')
+      .mockRejectedValueOnce(new Error('boom') as never);
+    try {
+      const response = await request(app)
+        .post('/auth/signup')
+        .send({ email: 'x@example.com', password: 'password123' });
+      expect(response.status).toBe(500);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 
