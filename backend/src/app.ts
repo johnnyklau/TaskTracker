@@ -10,13 +10,21 @@ import jwt from 'jsonwebtoken';
 import { authenticate } from './middleware/authenticate';
 import crypto from 'crypto';
 import { Pool, PoolClient } from 'pg';
+import { parseAllowedOrigins } from './config/origins';
 
 if (!process.env.JWT_SECRET) {
   console.error('FATAL: JWT_SECRET environment variable not set.');
   process.exit(1);
 }
 
+if (!process.env.ALLOWED_ORIGINS) {
+  console.error('FATAL: ALLOWED_ORIGINS environment variable not set.');
+  process.exit(1);
+}
+
 const MAX_POSTGRES_INT = 2147483647;
+const isProd = process.env.NODE_ENV === 'production';
+const allowedOrigins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS, isProd);
 
 function isValidId(id: string): boolean {
   return /^[1-9]\d*$/.test(id) && Number(id) <= MAX_POSTGRES_INT;
@@ -29,11 +37,7 @@ app.use(helmet());
 app.use(
   cors({
     origin: (origin, callback) => {
-      const allowed = [
-        'http://localhost:5173',
-        'http://localhost:5174',
-        'https://tasktracker-hsy.vercel.app',
-      ];
+      const allowed = allowedOrigins;
       if (!origin || allowed.includes(origin)) {
         callback(null, true);
       } else {
