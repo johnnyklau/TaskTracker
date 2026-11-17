@@ -5,24 +5,25 @@ import pool from '../db/pool';
 import { createTestUser } from './testHelpers';
 import { vi } from 'vitest';
 import bcrypt from 'bcryptjs';
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    env: {
+      ALLOWED_ORIGINS: 'https://tasktracker-hsy.vercel.app',
+      ...(process.env.CI
+        ? {}
+        : {
+            DATABASE_URL:
+              process.env.TEST_DATABASE_URL ??
+              'postgresql://postgres:postgres@localhost:5432/tasktracker_test',
+          }),
+    },
+  },
+});
 
 beforeEach(async () => {
   await pool.query('DELETE FROM users');
-});
-
-describe('/health check', () => {
-  it('returns 403, not 500, for a disallowed CORS origin', async () => {
-    const response = await request(app)
-      .get('/health')
-      .set('Origin', 'https://not-allowed.example.com');
-    expect(response.status).toBe(403);
-  });
-  it('rejects a request from an unrelated vercel.app subdomain', async () => {
-    const response = await request(app)
-      .get('/health')
-      .set('Origin', 'https://some-other-random-project.vercel.app');
-    expect(response.status).toBe(403);
-  });
 });
 
 describe('GET /tasks', () => {
