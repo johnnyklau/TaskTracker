@@ -6,6 +6,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/tasktracker
       - JWT_SECRET=replacethiswitharandomlongstring
+      - ALLOWED_ORIGINS=http://localhost:5173
     depends_on:
       postgres:
         condition: service_healthy
