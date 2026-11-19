@@ -1,4 +1,4 @@
-import type { Subtask } from '../api/tasks';
+import type { Subtask } from '../types';
 import { CloudShape } from './CloudShape';
 import { createNodeDragHandler } from './nodeDrag';
 import { CLOUD_ASPECT_RATIO, SUB_CLOUD_WIDTH } from './canvasConstants';

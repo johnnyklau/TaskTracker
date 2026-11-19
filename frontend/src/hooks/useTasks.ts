@@ -13,9 +13,8 @@ import {
   fetchTasks,
   updateSubtask,
   updateTask,
-  type Subtask,
-  type Task,
 } from '../api/tasks';
+import { TaskList, type Subtask, type Task } from '../types';
 import { useAuth } from '../context/useAuth';
 import {
   DEFAULT_SUBTASK_DX,
@@ -51,7 +50,8 @@ export function useAddTask() {
         x: null,
         y: null,
         subtasks: [],
-        task_list: 'saved',
+        task_list: TaskList.Saved,
+        priority: null,
       };
 
       queryClient.setQueryData<Task[]>(tasksKey, (old) => [
@@ -149,7 +149,12 @@ export function useUpdateTask() {
       updates,
     }: {
       id: number;
-      updates: Partial<Pick<Task, 'title' | 'notes' | 'x' | 'y' | 'completed'>>;
+      updates: Partial<
+        Pick<
+          Task,
+          'title' | 'notes' | 'x' | 'y' | 'completed' | 'task_list' | 'priority'
+        >
+      >;
     }) => updateTask(id, updates),
     onMutate: async ({ id, updates }) => {
       await queryClient.cancelQueries({ queryKey: tasksKey });

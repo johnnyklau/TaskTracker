@@ -1,13 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as api from '../api/tasks';
 import type { ReactNode } from 'react';
-import type { Task } from '../api/tasks';
+import type { Task } from '../types';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useDeleteTask, useUpdateSubtask } from '../hooks/useTasks';
 
 vi.mock('../api/tasks');
 
-function makeWrapper(intialTasks: api.Task[]) {
+function makeWrapper(intialTasks: Task[]) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -31,6 +31,8 @@ describe('useTasks rollback', () => {
         notes: '',
         x: 0,
         y: 0,
+        task_list: 'saved',
+        priority: null,
         subtasks: [
           {
             id: 10,
@@ -71,6 +73,8 @@ describe('useTasks rollback', () => {
         notes: '',
         x: 0,
         y: 0,
+        task_list: 'saved',
+        priority: null,
         subtasks: [],
       },
     ];

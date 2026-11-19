@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import type { Task } from '../api/tasks';
+import type { Task } from '../types';
 import { CloudShape } from './CloudShape';
 import { CLOUD_ASPECT_RATIO } from './canvasConstants';
 

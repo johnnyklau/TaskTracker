@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import App from '../App';
 import { vi } from 'vitest';
 import * as api from '../api/tasks';
-import type { Task } from '../api/tasks';
+import type { Task } from '../types';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as AuthContext from '../context/useAuth';
 
@@ -33,6 +33,8 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     x: 0,
     y: 0,
     subtasks: [],
+    task_list: 'saved',
+    priority: null,
     ...overrides,
   };
 }

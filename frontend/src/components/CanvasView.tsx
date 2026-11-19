@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
-import type { Task } from '../api/tasks';
+import { ViewMode, type Task } from '../types';
 import {
   useAddTask,
   useDeleteSubtask,
@@ -14,8 +14,6 @@ import { ListView } from './ListView';
 import { TaskView } from './TaskView';
 import { Toolbar } from './Toolbar';
 
-export type ViewMode = 'cloud' | 'list';
-
 type CanvasViewProps = {
   tasks: Task[];
 };
@@ -27,7 +25,7 @@ export function CanvasView({ tasks }: CanvasViewProps) {
   const deleteTask = useDeleteTask();
   const deleteSubtask = useDeleteSubtask();
 
-  const [view, setView] = useState<ViewMode>('cloud');
+  const [view, setView] = useState<ViewMode>(ViewMode.Cloud);
   const [openTaskId, setOpenTaskId] = useState<number | null>(null);
   const [draft, setDraft] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -50,7 +48,9 @@ export function CanvasView({ tasks }: CanvasViewProps) {
   }
 
   function toggleView() {
-    setView((current) => (current === 'cloud' ? 'list' : 'cloud'));
+    setView((current) =>
+      current === ViewMode.Cloud ? ViewMode.List : ViewMode.Cloud
+    );
   }
 
   const closeTask = useCallback(() => setOpenTaskId(null), []);
@@ -65,7 +65,7 @@ export function CanvasView({ tasks }: CanvasViewProps) {
 
   function handleAddSubtask(taskId: number) {
     // TODO: ListView needs its own inline add-subtask affordance.
-    if (view === 'cloud') cloudControlsRef.current?.startSubtask(taskId);
+    if (view === ViewMode.Cloud) cloudControlsRef.current?.startSubtask(taskId);
     closeTask();
   }
 
@@ -83,7 +83,7 @@ export function CanvasView({ tasks }: CanvasViewProps) {
 
   return (
     <div className="relative h-full min-h-140 w-full overflow-hidden bg-canvas">
-      {view === 'cloud' ? (
+      {view === ViewMode.Cloud ? (
         <CloudView
           tasks={tasks}
           openTaskId={openTaskId}
@@ -111,12 +111,12 @@ export function CanvasView({ tasks }: CanvasViewProps) {
         query={query}
         onQueryChange={setQuery}
         onRecenter={
-          view === 'cloud'
+          view === ViewMode.Cloud
             ? () => cloudControlsRef.current?.recenter()
             : undefined
         }
         onFitAll={
-          view === 'cloud'
+          view === ViewMode.Cloud
             ? () => cloudControlsRef.current?.fitAll()
             : undefined
         }

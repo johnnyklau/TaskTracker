@@ -6,7 +6,7 @@ import {
   useState,
 } from 'react';
 import type { PointerEvent as ReactPointerEvent, Ref } from 'react';
-import type { Task } from '../api/tasks';
+import type { Task } from '../types';
 import { useAddSubtask, useMoveSubtask, useMoveTask } from '../hooks/useTasks';
 import { TaskCloud } from './TaskCloud';
 import { SubtaskCloud } from './SubtaskCloud';

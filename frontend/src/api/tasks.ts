@@ -3,35 +3,13 @@ import {
   loadStoredAuth,
   saveStoredAuth,
 } from './authStorage';
+import type { Subtask, Task } from '../types';
 
 const envApiUrl = import.meta.env.VITE_API_URL;
 if (!envApiUrl && import.meta.env.PROD) {
   throw new Error('VITE_API_URL must be set in production builds');
 }
 export const API_URL = envApiUrl || 'http://localhost:3000';
-
-export type Subtask = {
-  id: number;
-  task_id: number;
-  title: string;
-  completed: boolean;
-  dx: number;
-  dy: number;
-  created_at: string;
-};
-
-export type Task = {
-  id: number;
-  title: string;
-  completed: boolean;
-  created_at: string;
-  notes: string;
-  x: number | null;
-  y: number | null;
-  subtasks: Subtask[];
-  task_list: string;
-  priority?: number;
-};
 
 function authHeaders(): HeadersInit {
   const { accessToken } = loadStoredAuth();

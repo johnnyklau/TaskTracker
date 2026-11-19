@@ -476,8 +476,7 @@ app.patch(
     if (req.body.task_list !== undefined) {
       if (
         typeof req.body.task_list !== 'string' ||
-        req.body.task_list !== 'saved' ||
-        req.body.task_list !== 'priority'
+        (req.body.task_list !== 'saved' && req.body.task_list !== 'priority')
       ) {
         return res
           .status(400)
@@ -485,6 +484,17 @@ app.patch(
       }
       fields.push(`task_list = $${paramIndex++}`);
       values.push(req.body.task_list);
+    }
+
+    if (req.body.priority !== undefined) {
+      if (
+        typeof req.body.priority !== 'number' ||
+        Number.isNaN(req.body.priority)
+      ) {
+        return res.status(400).json({ error: 'priority must be a number' });
+      }
+      fields.push(`priority = $${paramIndex++}`);
+      values.push(req.body.priority);
     }
 
     if (fields.length === 0) {

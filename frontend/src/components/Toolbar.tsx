@@ -1,6 +1,6 @@
 import { AccountMenu } from './AccountMenu';
 import { IoCloudOutline, IoListOutline } from 'react-icons/io5';
-import type { ViewMode } from './CanvasView';
+import { ViewMode } from '../types';
 
 type ToolbarProps = {
   draft: string;
@@ -166,13 +166,13 @@ export function Toolbar({
       <button
         onClick={onToggleView}
         title={
-          currentView === 'cloud'
+          currentView === ViewMode.Cloud
             ? 'Switch to list view'
             : 'Switch to cloud view'
         }
         className="grid h-10.5 w-10.5 place-items-center rounded-[14px] text-ink-mute transition-colors duration-180 hover:bg-hover-warm hover:text-ink"
       >
-        {currentView === 'cloud' ? (
+        {currentView === ViewMode.Cloud ? (
           <IoListOutline size={19} />
         ) : (
           <IoCloudOutline size={19} />

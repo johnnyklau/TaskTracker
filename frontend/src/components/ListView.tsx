@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import type { Task } from '../api/tasks';
+import type { Task } from '../types';
 
 type ListViewProps = {
   tasks: Task[];

@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import type { Task } from '../api/tasks';
+import type { Task } from '../types';
 import { CloudShape } from './CloudShape';
 import { createNodeDragHandler } from './nodeDrag';
 import { CLOUD_ASPECT_RATIO, MAIN_CLOUD_WIDTH } from './canvasConstants';
