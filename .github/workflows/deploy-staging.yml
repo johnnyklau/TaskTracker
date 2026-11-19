@@ -3,6 +3,9 @@ name: Deploy Staging
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: deploy-staging
   cancel-in-progress: true
