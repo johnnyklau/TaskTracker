@@ -1,0 +1,40 @@
+name: Deploy Staging
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: true
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci
+        working-directory: frontend
+      - run: npm install --global vercel@62.2.0
+      - run: vercel pull --yes --environment=preview --token=$VERCEL_TOKEN
+      - run: vercel build --token=$VERCEL_TOKEN
+      - id: deploy
+        run: echo "url=$(vercel deploy --prebuilt --token=$VERCEL_TOKEN)" >> "$GITHUB_OUTPUT"
+      - run: vercel alias set ${{ steps.deploy.outputs.url }} tasktracker-staging.vercel.app --token=$VERCEL_TOKEN
+
+  deploy-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger staging Render deploy
+        env:
+          HOOK: ${{ secrets.STAGING_RENDER_DEPLOY_HOOK_URL }}
+        run: curl -fsS -X POST "${HOOK}&ref=${{ github.sha }}"
