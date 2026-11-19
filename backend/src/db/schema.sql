@@ -13,7 +13,9 @@ CREATE TABLE tasks (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     notes TEXT NOT NULL DEFAULT '',
     x REAL,
-    y REAL
+    y REAL,
+    task_list TEXT NOT NULL DEFAULT 'saved' CHECK (task_list IN ('saved', 'priority')),
+    priority INTEGER
 );
 
 CREATE TABLE subtasks (

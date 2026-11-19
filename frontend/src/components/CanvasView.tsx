@@ -1,130 +1,39 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
 import { AnimatePresence } from 'motion/react';
 import type { Task } from '../api/tasks';
 import {
-  useAddSubtask,
   useAddTask,
   useDeleteSubtask,
   useDeleteTask,
-  useMoveSubtask,
-  useMoveTask,
   useUpdateSubtask,
   useUpdateTask,
 } from '../hooks/useTasks';
-import { TaskCloud } from './TaskCloud';
-import { SubtaskCloud } from './SubtaskCloud';
-import { DraftSubtaskCloud } from './DraftSubtaskCloud';
-import { Connector } from './Connector';
+import { CloudView } from './CloudView';
+import type { CloudViewControls } from './CloudView';
+import { ListView } from './ListView';
 import { TaskView } from './TaskView';
 import { Toolbar } from './Toolbar';
-import {
-  CLOUD_ASPECT_RATIO,
-  MAIN_CLOUD_WIDTH,
-  MAX_ZOOM,
-  MIN_ZOOM,
-  SUB_CLOUD_WIDTH,
-} from './canvasConstants';
-import { findTaskPlacement, findSubtaskPlacement } from './CanvasHelpers';
+
+export type ViewMode = 'cloud' | 'list';
 
 type CanvasViewProps = {
   tasks: Task[];
 };
 
-type Cam = { x: number; y: number };
-
 export function CanvasView({ tasks }: CanvasViewProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const moveTask = useMoveTask();
-  const moveSubtask = useMoveSubtask();
   const updateTask = useUpdateTask();
   const updateSubtask = useUpdateSubtask();
   const addTask = useAddTask();
   const deleteTask = useDeleteTask();
   const deleteSubtask = useDeleteSubtask();
-  const addSubtask = useAddSubtask();
 
-  const [cam, setCam] = useState<Cam>({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [camAnim, setCamAnim] = useState(false);
+  const [view, setView] = useState<ViewMode>('cloud');
   const [openTaskId, setOpenTaskId] = useState<number | null>(null);
   const [draft, setDraft] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [draftSubtask, setDraftSubtask] = useState<{
-    taskId: number;
-    dx: number;
-    dy: number;
-  } | null>(null);
 
-  const glideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined
-  );
-  const placedRef = useRef(new Set<number>());
-  const didFitRef = useRef(false);
-  const zoomRef = useRef(zoom);
-  const camRef = useRef(cam);
-  const openTaskIdRef = useRef(openTaskId);
-
-  const glideTo = useCallback(
-    (x: number, y: number, nextZoom: number, instant: boolean) => {
-      setCam({ x, y });
-      setZoom(nextZoom);
-      setCamAnim(!instant);
-      if (glideTimerRef.current) clearTimeout(glideTimerRef.current);
-      if (!instant) {
-        glideTimerRef.current = setTimeout(() => setCamAnim(false), 560);
-      }
-    },
-    []
-  );
-
-  const fitAll = useCallback(
-    (instant: boolean) => {
-      const boxes: Array<[number, number, number]> = [];
-      tasks.forEach((task) => {
-        if (task.x === null || task.y === null) return;
-        boxes.push([task.x, task.y, MAIN_CLOUD_WIDTH]);
-        task.subtasks.forEach((subtask) =>
-          boxes.push([
-            task.x! + subtask.dx,
-            task.y! + subtask.dy,
-            SUB_CLOUD_WIDTH,
-          ])
-        );
-      });
-
-      if (boxes.length === 0) {
-        glideTo(0, 0, 1, instant);
-        return;
-      }
-
-      const x0 = Math.min(...boxes.map(([bx, , w]) => bx - w / 2));
-      const x1 = Math.max(...boxes.map(([bx, , w]) => bx + w / 2));
-      const y0 = Math.min(
-        ...boxes.map(([, by, w]) => by - w / CLOUD_ASPECT_RATIO / 2)
-      );
-      const y1 = Math.max(
-        ...boxes.map(([, by, w]) => by + w / CLOUD_ASPECT_RATIO / 2)
-      );
-
-      const rect = rootRef.current?.getBoundingClientRect();
-      const width = rect?.width || window.innerWidth;
-      const height = rect?.height || window.innerHeight;
-
-      const floor = instant ? 0.5 : 0.35;
-      const scale = Math.max(
-        floor,
-        Math.min(1, (width - 72) / (x1 - x0), (height - 120) / (y1 - y0))
-      );
-      const cx = (x0 + x1) / 2;
-      const cy = (y0 + y1) / 2;
-      glideTo(-cx * scale, -cy * scale - 34, scale, instant);
-    },
-    [tasks, glideTo]
-  );
-
-  const recenter = useCallback(() => glideTo(0, 0, 1, false), [glideTo]);
+  const cloudControlsRef = useRef<CloudViewControls>(null);
 
   function handleAddTask() {
     const title = draft.trim();
@@ -140,51 +49,9 @@ export function CanvasView({ tasks }: CanvasViewProps) {
     });
   }
 
-  // Auto-place any task that's never been positioned, then persist it.
-  // Skips optimistic (negative-id) tasks still awaiting their real server id
-  // — placing those would PATCH a position against an id that doesn't exist
-  // yet server-side. Once useAddTask's onSuccess swaps in the real task
-  // (still x/y null), this effect picks it up and places it for real.
-  useEffect(() => {
-    const alreadyPlaced: { x: number; y: number }[] = [];
-    tasks.forEach((task) => {
-      if (task.x === null || task.y === null) return;
-      alreadyPlaced.push({ x: task.x, y: task.y });
-      task.subtasks.forEach((s) => {
-        alreadyPlaced.push({ x: task.x! + s.dx, y: task.y! + s.dy });
-      });
-    });
-
-    tasks.forEach((task) => {
-      if (task.x !== null && task.y !== null) return;
-      if (task.id < 0) return;
-      if (placedRef.current.has(task.id)) return;
-      placedRef.current.add(task.id);
-
-      const { x, y } = findTaskPlacement(alreadyPlaced);
-      alreadyPlaced.push({ x, y });
-      moveTask(task.id, x, y);
-    });
-  }, [tasks, moveTask]);
-
-  // Initial framing, once every task has a real position. Deferred a frame
-  // (matching the prototype) so the root element has real layout to measure.
-  useEffect(() => {
-    if (didFitRef.current) return;
-    if (tasks.length === 0) return;
-    if (tasks.some((task) => task.x === null || task.y === null)) return;
-    didFitRef.current = true;
-    const raf = requestAnimationFrame(() => fitAll(true));
-    return () => cancelAnimationFrame(raf);
-  }, [tasks, fitAll]);
-
-  useEffect(() => {
-    function handleResize() {
-      fitAll(true);
-    }
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [fitAll]);
+  function toggleView() {
+    setView((current) => (current === 'cloud' ? 'list' : 'cloud'));
+  }
 
   const closeTask = useCallback(() => setOpenTaskId(null), []);
 
@@ -196,90 +63,13 @@ export function CanvasView({ tasks }: CanvasViewProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [closeTask]);
 
-  function handleBackgroundPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
-    if (openTaskId !== null) return;
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const originCam = cam;
-
-    function handleMove(ev: PointerEvent) {
-      setCam({
-        x: originCam.x + (ev.clientX - startX),
-        y: originCam.y + (ev.clientY - startY),
-      });
-    }
-    function handleUp() {
-      window.removeEventListener('pointermove', handleMove);
-      window.removeEventListener('pointerup', handleUp);
-    }
-    window.addEventListener('pointermove', handleMove);
-    window.addEventListener('pointerup', handleUp);
-  }
-
-  // Wheel-zoom needs preventDefault to stop page scroll while zooming, but
-  // React's onWheel is attached passive — preventDefault silently no-ops
-  // there (confirmed via a real browser: "Unable to preventDefault inside
-  // passive event listener invocation"). A native, explicitly non-passive
-  // listener is the standard workaround. Refs avoid re-subscribing it on
-  // every zoom/pan tick.
-  useEffect(() => {
-    zoomRef.current = zoom;
-  }, [zoom]);
-  useEffect(() => {
-    camRef.current = cam;
-  }, [cam]);
-  useEffect(() => {
-    openTaskIdRef.current = openTaskId;
-  }, [openTaskId]);
-
-  useEffect(() => {
-    const el = rootRef.current;
-    if (!el) return;
-
-    function handleWheel(e: WheelEvent) {
-      if (openTaskIdRef.current !== null) return;
-      e.preventDefault();
-
-      const currentZoom = zoomRef.current;
-      const nextZoom = Math.min(
-        MAX_ZOOM,
-        Math.max(MIN_ZOOM, currentZoom * Math.exp(-e.deltaY * 0.0015))
-      );
-      if (nextZoom === currentZoom) return;
-
-      const rect = el!.getBoundingClientRect();
-      const px = e.clientX - (rect.left + rect.width / 2);
-      const py = e.clientY - (rect.top + rect.height / 2);
-      const k = 1 - nextZoom / currentZoom;
-      const prevCam = camRef.current;
-
-      setZoom(nextZoom);
-      setCamAnim(false);
-      setCam({
-        x: prevCam.x + (px - prevCam.x) * k,
-        y: prevCam.y + (py - prevCam.y) * k,
-      });
-    }
-
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => el.removeEventListener('wheel', handleWheel);
-  }, []);
-
-  function handleOpenTask(taskId: number) {
-    setOpenTaskId(taskId);
-  }
-
   function handleAddSubtask(taskId: number) {
-    const task = tasks.find((t) => t.id === taskId);
-    const position = findSubtaskPlacement(task?.subtasks ?? []);
-    setDraftSubtask({ taskId, ...position });
+    // TODO: ListView needs its own inline add-subtask affordance.
+    if (view === 'cloud') cloudControlsRef.current?.startSubtask(taskId);
     closeTask();
   }
 
   const openTask = tasks.find((task) => task.id === openTaskId) ?? null;
-  const draftSubtaskTask = draftSubtask
-    ? (tasks.find((task) => task.id === draftSubtask.taskId) ?? null)
-    : null;
 
   const trimmedQuery = query.trim().toLowerCase();
   function matchesQuery(task: Task): boolean {
@@ -292,92 +82,23 @@ export function CanvasView({ tasks }: CanvasViewProps) {
   }
 
   return (
-    <div
-      ref={rootRef}
-      className="relative h-full min-h-140 w-full cursor-grab touch-none overflow-hidden bg-canvas select-none"
-      style={{
-        backgroundImage: 'radial-gradient(#E9D2B8 1.6px, transparent 1.6px)',
-        backgroundSize: '30px 30px',
-        backgroundPosition: `${cam.x}px ${cam.y}px`,
-      }}
-      onPointerDown={handleBackgroundPointerDown}
-    >
-      <div
-        className="absolute left-1/2 top-1/2 h-0 w-0"
-        style={{
-          transform: `translate(${cam.x}px, ${cam.y}px) scale(${zoom})`,
-          transition: camAnim
-            ? 'transform 520ms cubic-bezier(.3,1.02,.36,1)'
-            : 'none',
-        }}
-      >
-        <div
-          className="pointer-events-none absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 text-center text-[180px] leading-none font-extrabold tracking-[-2px] text-logo"
-          style={{ width: 1440 }}
-        >
-          TASKTRACKER
-        </div>
-
-        {tasks.map((task) =>
-          task.subtasks.map((subtask) => (
-            <Connector
-              key={subtask.id}
-              originX={task.x ?? 0}
-              originY={task.y ?? 0}
-              dx={subtask.dx}
-              dy={subtask.dy}
-            />
-          ))
-        )}
-
-        {tasks.map(
-          (task) =>
-            task.id !== openTaskId && (
-              <TaskCloud
-                key={task.id}
-                task={task}
-                zoom={zoom}
-                opacity={matchesQuery(task) ? 1 : 0.22}
-                onMove={moveTask}
-                onOpen={handleOpenTask}
-              />
-            )
-        )}
-
-        {tasks.map((task) =>
-          task.subtasks.map((subtask) => (
-            <SubtaskCloud
-              key={subtask.id}
-              subtask={subtask}
-              taskId={task.id}
-              originX={task.x ?? 0}
-              originY={task.y ?? 0}
-              zoom={zoom}
-              opacity={matchesQuery(task) ? 1 : 0.22}
-              onMove={moveSubtask}
-              onOpen={handleOpenTask}
-            />
-          ))
-        )}
-
-        {draftSubtaskTask && draftSubtask && (
-          <DraftSubtaskCloud
-            originX={draftSubtaskTask.x ?? 0}
-            originY={draftSubtaskTask.y ?? 0}
-            dx={draftSubtask.dx}
-            dy={draftSubtask.dy}
-            onCommit={(title) => {
-              addSubtask.mutate({
-                taskId: draftSubtaskTask.id,
-                title,
-                position: { dx: draftSubtask.dx, dy: draftSubtask.dy },
-              });
-              setDraftSubtask(null);
-            }}
-            onCancel={() => setDraftSubtask(null)}
-          />
-        )}
-      </div>
+    <div className="relative h-full min-h-140 w-full overflow-hidden bg-canvas">
+      {view === 'cloud' ? (
+        <CloudView
+          tasks={tasks}
+          openTaskId={openTaskId}
+          onOpenTask={setOpenTaskId}
+          matchesQuery={matchesQuery}
+          controlsRef={cloudControlsRef}
+        />
+      ) : (
+        <ListView
+          tasks={tasks}
+          openTaskId={openTaskId}
+          onOpenTask={setOpenTaskId}
+          matchesQuery={matchesQuery}
+        />
+      )}
 
       <Toolbar
         draft={draft}
@@ -385,10 +106,20 @@ export function CanvasView({ tasks }: CanvasViewProps) {
         onAddTask={handleAddTask}
         searchOpen={searchOpen}
         onToggleSearch={toggleSearch}
+        currentView={view}
+        onToggleView={toggleView}
         query={query}
         onQueryChange={setQuery}
-        onRecenter={recenter}
-        onFitAll={() => fitAll(false)}
+        onRecenter={
+          view === 'cloud'
+            ? () => cloudControlsRef.current?.recenter()
+            : undefined
+        }
+        onFitAll={
+          view === 'cloud'
+            ? () => cloudControlsRef.current?.fitAll()
+            : undefined
+        }
       />
 
       <AnimatePresence>

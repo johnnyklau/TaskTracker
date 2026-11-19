@@ -51,6 +51,7 @@ export function useAddTask() {
         x: null,
         y: null,
         subtasks: [],
+        task_list: 'saved',
       };
 
       queryClient.setQueryData<Task[]>(tasksKey, (old) => [

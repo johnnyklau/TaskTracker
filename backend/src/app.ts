@@ -473,6 +473,20 @@ app.patch(
       values.push(req.body.y);
     }
 
+    if (req.body.task_list !== undefined) {
+      if (
+        typeof req.body.task_list !== 'string' ||
+        req.body.task_list !== 'saved' ||
+        req.body.task_list !== 'priority'
+      ) {
+        return res
+          .status(400)
+          .json({ error: 'task list incorrectly formatted' });
+      }
+      fields.push(`task_list = $${paramIndex++}`);
+      values.push(req.body.task_list);
+    }
+
     if (fields.length === 0) {
       return res.status(400).json({ error: 'No valid fields provided' });
     }

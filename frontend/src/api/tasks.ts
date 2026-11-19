@@ -29,6 +29,8 @@ export type Task = {
   x: number | null;
   y: number | null;
   subtasks: Subtask[];
+  task_list: string;
+  priority?: number;
 };
 
 function authHeaders(): HeadersInit {

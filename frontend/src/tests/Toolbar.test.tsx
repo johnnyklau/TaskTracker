@@ -23,6 +23,8 @@ describe('Toolbar + AccountMenu interaction', () => {
         onAddTask={vi.fn()}
         searchOpen={false}
         onToggleSearch={vi.fn()}
+        currentView="cloud"
+        onToggleView={vi.fn()}
         query=""
         onQueryChange={vi.fn()}
         onRecenter={vi.fn()}
@@ -36,5 +38,32 @@ describe('Toolbar + AccountMenu interaction', () => {
     await user.click(screen.getByTitle('Search tasks'));
 
     expect(screen.queryByText('test@example.com')).not.toBeInTheDocument();
+  });
+
+  it('hides canvas-only controls when their handlers are omitted', () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue({
+      user: { id: 1, email: 'test@example.com' },
+      login: vi.fn(),
+      signup: vi.fn(),
+      logout: vi.fn(),
+    });
+
+    render(
+      <Toolbar
+        draft=""
+        onDraftChange={vi.fn()}
+        onAddTask={vi.fn()}
+        searchOpen={false}
+        onToggleSearch={vi.fn()}
+        currentView="list"
+        onToggleView={vi.fn()}
+        query=""
+        onQueryChange={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByTitle('Recenter canvas')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Fit all tasks')).not.toBeInTheDocument();
+    expect(screen.getByTitle('Switch to cloud view')).toBeInTheDocument();
   });
 });
