@@ -17,7 +17,7 @@ import { SubtaskCloud } from './SubtaskCloud';
 import { DraftSubtaskCloud } from './DraftSubtaskCloud';
 import { Connector } from './Connector';
 import { TaskView } from './TaskView';
-import { Toolbar } from './Toolbar';
+import { Toolbar } from './toolbar/Toolbar';
 import {
   CLOUD_ASPECT_RATIO,
   MAIN_CLOUD_WIDTH,
@@ -48,8 +48,6 @@ export function CanvasView({ tasks }: CanvasViewProps) {
   const [zoom, setZoom] = useState(1);
   const [camAnim, setCamAnim] = useState(false);
   const [openTaskId, setOpenTaskId] = useState<number | null>(null);
-  const [draft, setDraft] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [draftSubtask, setDraftSubtask] = useState<{
     taskId: number;
@@ -126,18 +124,8 @@ export function CanvasView({ tasks }: CanvasViewProps) {
 
   const recenter = useCallback(() => glideTo(0, 0, 1, false), [glideTo]);
 
-  function handleAddTask() {
-    const title = draft.trim();
-    if (!title) return;
+  function handleAddTask(title: string) {
     addTask.mutate(title);
-    setDraft('');
-  }
-
-  function toggleSearch() {
-    setSearchOpen((open) => {
-      if (open) setQuery('');
-      return !open;
-    });
   }
 
   // Auto-place any task that's never been positioned, then persist it.
@@ -380,11 +368,7 @@ export function CanvasView({ tasks }: CanvasViewProps) {
       </div>
 
       <Toolbar
-        draft={draft}
-        onDraftChange={setDraft}
         onAddTask={handleAddTask}
-        searchOpen={searchOpen}
-        onToggleSearch={toggleSearch}
         query={query}
         onQueryChange={setQuery}
         onRecenter={recenter}

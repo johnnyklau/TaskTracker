@@ -1,10 +1,10 @@
 import { vi } from 'vitest';
-import * as AuthContext from '../context/useAuth';
-import { AccountMenu } from '../components/AccountMenu';
+import * as AuthContext from '../../../context/useAuth';
+import { AccountMenu } from '../AccountMenu';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-vi.mock('../context/useAuth');
+vi.mock('../../../context/useAuth');
 
 describe('AccountMenu', () => {
   it('renders nothing when logged out', () => {

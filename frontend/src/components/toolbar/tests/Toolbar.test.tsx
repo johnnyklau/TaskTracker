@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
-import { Toolbar } from '../components/Toolbar';
-import * as AuthContext from '../context/useAuth';
+import { Toolbar } from '../Toolbar';
+import * as AuthContext from '../../../context/useAuth';
 
-vi.mock('../context/useAuth');
+vi.mock('../../../context/useAuth');
 
 describe('Toolbar + AccountMenu interaction', () => {
   it('closes the account menu when clicking a different toolbar button', async () => {
@@ -18,11 +18,7 @@ describe('Toolbar + AccountMenu interaction', () => {
 
     render(
       <Toolbar
-        draft=""
-        onDraftChange={vi.fn()}
         onAddTask={vi.fn()}
-        searchOpen={false}
-        onToggleSearch={vi.fn()}
         query=""
         onQueryChange={vi.fn()}
         onRecenter={vi.fn()}
@@ -33,7 +29,7 @@ describe('Toolbar + AccountMenu interaction', () => {
     await user.click(screen.getByTitle('Account'));
     expect(screen.getByText('test@example.com')).toBeInTheDocument();
 
-    await user.click(screen.getByTitle('Search tasks'));
+    await user.click(screen.getByTitle('Filter tasks'));
 
     expect(screen.queryByText('test@example.com')).not.toBeInTheDocument();
   });
